@@ -1,0 +1,42 @@
+# 依赖与构建产物
+node_modules/
+dist/
+out/
+build/
+*.tsbuildinfo
+
+# 运行时和临时文件
+.DS_Store
+.eslintcache
+*.log*
+*.tmp
+*.swp
+
+# VSCode 配置
+.vscode/*
+!.vscode/extensions.json
+!.vscode/launch.json
+!.vscode/settings.json
+
+# 环境变量
+.env
+.env.*
+env/.env*
+.env.local
+
+# 数据库与本地存储
+*.sqlite
+*.db
+*.db-journal
+
+# Electron/平台相关
+*.asar
+*.exe
+*.app
+*.dmg
+*.deb
+*.rpm
+
+# 测试输出
+coverage/
+test-results/

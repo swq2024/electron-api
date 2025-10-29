@@ -1,0 +1,107 @@
+#!/usr/bin/env node
+
+/**
+ * Module dependencies.
+ */
+const app = require('../app');
+const debug = require('debug')('backend-service:server');
+const http = require('http');
+const { sequelize } = require('../models'); // 引入 Sequelize 实例
+
+/**
+ * 解析命令行参数：[port] [dbPath]
+ */
+const args = process.argv.slice(2);
+const port = normalizePort(args[0] || process.env.PORT || '3000');
+const customDbPath = args[1]; // 从命令行获取数据库路径
+
+// 设置环境变量，供 models/index.js 使用
+if (customDbPath) {
+  process.env.BACKEND_DB_PATH = customDbPath;
+}
+
+app.set('port', port);
+
+/**
+ * Create HTTP server.
+ */
+const server = http.createServer(app);
+
+/**
+ * 启动服务
+ */
+server.listen(port);
+server.on('error', onError);
+server.on('listening', onListening);
+
+/**
+ * 优雅退出：关闭服务和数据库连接
+ */
+function gracefulShutdown() {
+  console.log('Backend Service is closing...');
+  server.close(() => {
+    console.log('HTTP Service is closed.');
+    sequelize.close().then(() => {
+      console.log('collection of datase is closed.');
+      process.exit(0);
+    }).catch(err => {
+      console.error('database close error：', err);
+      process.exit(1);
+    });
+  });
+
+  // 超时强制退出
+  setTimeout(() => {
+    console.error('closing timeout, force exit.');
+    process.exit(1);
+  }, 5000);
+}
+
+// 监听终止信号
+process.on('SIGINT', gracefulShutdown);
+process.on('SIGTERM', gracefulShutdown);
+
+/**
+ * 原有工具函数（保持不变）
+ */
+function normalizePort(val) {
+  const port = parseInt(val, 10);
+  if (isNaN(port)) return val;
+  if (port >= 0) return port;
+  return false;
+}
+
+function onError(error) {
+  if (error.syscall !== 'listen') throw error;
+  const bind = typeof port === 'string' ? 'Pipe ' + port : 'Port ' + port;
+  switch (error.code) {
+    case 'EACCES':
+      console.error(bind + ' 需要管理员权限');
+      process.exit(1);
+      break;
+    case 'EADDRINUSE':
+      console.error(bind + ' 已被占用');
+      process.exit(1);
+      break;
+    default:
+      throw error;
+  }
+}
+
+function onListening() {
+  const addr = server.address();
+  const bind = typeof addr === 'string' ? 'pipe ' + addr : 'port ' + addr.port;
+  debug('Listening on ' + bind);
+  console.log('Backend service started successfully, listening:' + bind); // 输出启动成功日志
+
+  // 新增：同步 Sequelize 模型到 MySQL（创建表）
+  (async () => {
+    try {
+      // force: false → 若表已存在，不删除重建（安全）；force: true → 先删表再重建（谨慎使用）
+      await sequelize.sync({ force: false });
+      console.log('MySQL table structure synchronization completed! Tables have been created/updated.');
+    } catch (err) {
+      console.error('MySQL synchronization failed：', err.message);
+    }
+  })();
+}
