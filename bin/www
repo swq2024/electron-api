@@ -7,13 +7,16 @@ const app = require('../app');
 const debug = require('debug')('backend-service:server');
 const http = require('http');
 const { sequelize } = require('../models'); // 引入 Sequelize 实例
-
 /**
  * 解析命令行参数：[port] [dbPath]
+ * 注意：当通过 nodemon 启动时，第一个参数可能是脚本路径
  */
-const args = process.argv.slice(2);
-const port = normalizePort(args[0] || process.env.PORT || '3000');
-const customDbPath = args[1]; // 从命令行获取数据库路径
+const args = process.argv.slice(2); // ["./bin/www"]
+
+// 过滤掉 nodemon 传递的脚本路径参数
+const filteredArgs = args.filter(arg => !arg.includes('bin/www')); // []
+const port = normalizePort(filteredArgs[0] || process.env.PORT || '3000');
+const customDbPath = filteredArgs[1]; // 从命令行获取数据库路径
 
 // 设置环境变量，供 models/index.js 使用
 if (customDbPath) {
@@ -78,7 +81,6 @@ function onError(error) {
     case 'EACCES':
       console.error(bind + ' 需要管理员权限');
       process.exit(1);
-      break;
     case 'EADDRINUSE':
       console.error(bind + ' 已被占用');
       process.exit(1);

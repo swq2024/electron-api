@@ -19,10 +19,10 @@ build/
 !.vscode/settings.json
 
 # 环境变量
-.env
-.env.*
+# .env # 已使用 dotenvx 第三方库进行加密
+.env.* 
 env/.env*
-.env.local
+
 
 # 数据库与本地存储
 *.sqlite
@@ -40,3 +40,7 @@ env/.env*
 # 测试输出
 coverage/
 test-results/
+
+# 私钥存储以及本地密钥管理目录
+.pem
+.vault/
