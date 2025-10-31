@@ -1,4 +1,3 @@
-// utils/envWatcher.js
 const chokidar = require('chokidar');
 const crypto = require('crypto');
 const fs = require('fs');

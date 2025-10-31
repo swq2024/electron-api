@@ -5,7 +5,7 @@ function loadEnv() {
     const env = process.env.NODE_ENV || 'development';
     const basePath = process.cwd();
 
-    // 加载优先级: .env.local > .env.development/.env.production > .env
+    // 变量相同的情况下, 加载优先级: .env.local > .env.development > .env
     const envFiles = [
         join(basePath, '.env'),
         join(basePath, `.env.${env}`),
