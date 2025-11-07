@@ -6,43 +6,34 @@ const Sequelize = require('sequelize');
 const process = require('process');
 const basename = path.basename(__filename);
 const env = process.env.NODE_ENV || 'development';
-const config = require(__dirname + '/../config/config.json')[env]; // 原配置文件
+const config = require(__dirname + '/../config/config.json')[env];
 const db = {};
 
-// --------------------------
-// 核心改造：支持动态数据库路径
-// --------------------------
 let sequelize;
-if (config.use_env_constiable) { // 修正原代码拼写错误：use_env_constiable → use_env_variable（保持兼容）
+if (config.use_env_constiable) {
+  // 使用环境变量中的数据库连接信息 (例如：DATABASE_URL="postgres://user:pass@example.com/dbname")
   sequelize = new Sequelize(process.env[config.use_env_constiable], config);
 } else {
-  // 复制原始配置，避免修改原对象
-  const dbConfig = { ...config };
-  
-  // 关键：如果有从外部传入的数据库路径（如 Electron 主进程指定），则覆盖配置
-  if (process.env.BACKEND_DB_PATH) {
-    // 优先使用环境变量（更安全，避免全局变量污染）
-    dbConfig.storage = process.env.BACKEND_DB_PATH;
-    console.log('使用环境变量指定的数据库路径：', dbConfig.storage);
-  } else if (global.customDbPath) {
-    // 兼容通过全局变量传入的路径（备选方案）
-    dbConfig.storage = global.customDbPath;
-    console.log('使用全局变量指定的数据库路径：', dbConfig.storage);
-  }
-  // 若没有外部路径，则使用 config.json 中的默认配置
-
-  // 初始化 Sequelize 实例（使用可能被修改过的 dbConfig）
+  // 初始化 Sequelize 实例
   sequelize = new Sequelize(
-    dbConfig.database,
-    dbConfig.username,
-    dbConfig.password,
-    dbConfig
+    config.database,
+    config.username,
+    config.password,
+    config
   );
 }
 
-// --------------------------
-// 以下为原有逻辑（保持不变）
-// --------------------------
+// async function initialize() {
+//   try {
+//     // 测试数据库连接是否成功，并同步所有模型到数据库
+//     await sequelize.authenticate();
+//     console.log('Connection has been established successfully.');
+//   } catch (error) {
+//     console.error('Unable to connect to the database:', error);
+//   }
+// }
+// initialize();
+
 fs
   .readdirSync(__dirname)
   .filter(file => {

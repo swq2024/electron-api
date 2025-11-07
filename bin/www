@@ -6,23 +6,11 @@
 const app = require('../app');
 const debug = require('debug')('backend-service:server');
 const http = require('http');
-const { sequelize } = require('../models'); // 引入 Sequelize 实例
+
 /**
- * 解析命令行参数：[port] [dbPath]
- * 注意：当通过 nodemon 启动时，第一个参数可能是脚本路径
+ * Get port from environment and store in Express.
  */
-const args = process.argv.slice(2); // ["./bin/www"]
-
-// 过滤掉 nodemon 传递的脚本路径参数
-const filteredArgs = args.filter(arg => !arg.includes('bin/www')); // []
-const port = normalizePort(filteredArgs[0] || process.env.PORT || '3000');
-const customDbPath = filteredArgs[1]; // 从命令行获取数据库路径
-
-// 设置环境变量，供 models/index.js 使用
-if (customDbPath) {
-  process.env.BACKEND_DB_PATH = customDbPath;
-}
-
+const port = normalizePort(process.env.PORT || '3000');
 app.set('port', port);
 
 /**
@@ -41,38 +29,43 @@ server.on('listening', onListening);
  * 优雅退出：关闭服务和数据库连接
  */
 function gracefulShutdown() {
-  console.log('Backend Service is closing...');
-  server.close(() => {
-    console.log('HTTP Service is closed.');
-    sequelize.close().then(() => {
-      console.log('collection of datase is closed.');
-      process.exit(0);
-    }).catch(err => {
-      console.error('database close error：', err);
+  server.close((err) => {
+    if (err) {
+      console.error('[Shutdown] Server close error:', err.message);
       process.exit(1);
-    });
-  });
-
-  // 超时强制退出
-  setTimeout(() => {
-    console.error('closing timeout, force exit.');
-    process.exit(1);
-  }, 5000);
+    }
+  })
+  console.log('[Shutdown] HTTP server closed');
+  process.exit(0);
 }
 
-// 监听终止信号
+// 监听 Ctrl+C 触发的中断信号
 process.on('SIGINT', gracefulShutdown);
+// 系统或容器发送的终止请求信号[Docker 容器重启时发送的终止信号/Kubernetes 滚动更新时发送的终止信号/系统管理员通过 kill 命令发送的默认信号]
 process.on('SIGTERM', gracefulShutdown);
 
 /**
- * 原有工具函数（保持不变）
+ * Normalize a port into a number, string, or false.
  */
+
 function normalizePort(val) {
   const port = parseInt(val, 10);
-  if (isNaN(port)) return val;
-  if (port >= 0) return port;
+  if (isNaN(port)) {
+    // named pipe
+    return val;
+  }
+
+  if (port >= 0) {
+    // port number
+    return port;
+  }
+
   return false;
 }
+
+/**
+ * Event listener for HTTP server "error" event.
+ */
 
 function onError(error) {
   if (error.syscall !== 'listen') throw error;
@@ -90,20 +83,14 @@ function onError(error) {
   }
 }
 
+/**
+ * Event listener for HTTP server "listening" event.
+ */
+
 function onListening() {
   const addr = server.address();
-  const bind = typeof addr === 'string' ? 'pipe ' + addr : 'port ' + addr.port;
+  const bind = typeof addr === 'string'
+    ? 'pipe ' + addr
+    : 'port ' + addr.port;
   debug('Listening on ' + bind);
-  console.log('Backend service started successfully, listening:' + bind); // 输出启动成功日志
-
-  // 新增：同步 Sequelize 模型到 MySQL（创建表）
-  (async () => {
-    try {
-      // force: false → 若表已存在，不删除重建（安全）；force: true → 先删表再重建（谨慎使用）
-      await sequelize.sync({ force: false });
-      console.log('MySQL table structure synchronization completed! Tables have been created/updated.');
-    } catch (err) {
-      console.error('MySQL synchronization failed：', err.message);
-    }
-  })();
 }
