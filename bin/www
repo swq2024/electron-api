@@ -32,11 +32,11 @@ function gracefulShutdown() {
   server.close((err) => {
     if (err) {
       console.error('[Shutdown] Server close error:', err.message);
-      process.exit(1);
+      process.exit(1); // 非0都为异常退出程序
     }
   })
   console.log('[Shutdown] HTTP server closed');
-  process.exit(0);
+  process.exit(0); // 正常关闭
 }
 
 // 监听 Ctrl+C 触发的中断信号

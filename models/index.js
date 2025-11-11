@@ -19,20 +19,19 @@ if (config.use_env_constiable) {
     config.database,
     config.username,
     config.password,
-    config
+    config,
+    // 添加其他配置选项
+    {
+      logging: env === 'development' ? console.log : false,
+      pool: { 
+        max: 5,
+        min: 0,
+        acquire: 30000,
+        idle: 10000
+      }
+    }
   );
 }
-
-// async function initialize() {
-//   try {
-//     // 测试数据库连接是否成功，并同步所有模型到数据库
-//     await sequelize.authenticate();
-//     console.log('Connection has been established successfully.');
-//   } catch (error) {
-//     console.error('Unable to connect to the database:', error);
-//   }
-// }
-// initialize();
 
 fs
   .readdirSync(__dirname)

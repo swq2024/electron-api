@@ -1,0 +1,65 @@
+const express = require('express');
+const { body, query } = require('express-validator');
+const userController = require('../controllers/userController');
+const { authenticate } = require('../middlewares/auth');
+
+const router = express.Router();
+
+// 所有用户路由都需要认证
+router.use(authenticate);
+
+// 获取用户信息
+router.get('/profile', userController.getProfile);
+
+// 更新用户信息
+router.put('/profile', [
+  body('username')
+    .optional()
+    .isLength({ min: 3, max: 50 })
+    .withMessage('Username must be between 3 and 50 characters'),
+  body('email')
+    .optional()
+    .isEmail()
+    .withMessage('Please provide a valid email'),
+  body('masterPasswordHint')
+    .optional()
+    .isLength({ max: 255 })
+    .withMessage('Master password hint must be less than 255 characters')
+], userController.updateProfile);
+
+// 修改密码
+router.put('/password', [
+  body('currentPassword')
+    .notEmpty()
+    .withMessage('Current password is required'),
+  body('newPassword')
+    .isLength({ min: 8 })
+    .withMessage('New password must be at least 8 characters long')
+    .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/) // 至少包含一个小写字母，一个大写字母和一个数字
+    .withMessage('New password must contain at least one lowercase letter, one uppercase letter, and one number')
+], userController.changePassword);
+
+// 启用/禁用双因素认证
+router.put('/two-factor', [
+  body('enable')
+    .isBoolean()
+    .withMessage('Enable must be a boolean'),
+  body('secret')
+    .if(body('enable').equals(true)) // 如果启用双因素认证，则需要提供密钥
+    .notEmpty()
+    .withMessage('Two-factor secret is required when enabling 2FA')
+], userController.toggleTwoFactorAuth);
+
+// 获取安全日志
+router.get('/security-logs', [
+  query('page')
+    .optional()
+    .isInt({ min: 1 })
+    .withMessage('Page must be a positive integer'),
+  query('limit')
+    .optional()
+    .isInt({ min: 1, max: 100 })
+    .withMessage('Limit must be between 1 and 100')
+], userController.getSecurityLogs);
+
+module.exports = router;

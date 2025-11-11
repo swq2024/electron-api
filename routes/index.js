@@ -1,13 +1,39 @@
 const express = require('express');
-const router = express.Router();
 const fs = require('fs');
 
+const authRoutes = require('./auth');
+const userRoutes = require('./users');
+const passwordRoutes = require('./passwords');
+const categoryRoutes = require('./categories');
+const toolsRoutes = require('./tools');
+const adminRoutes = require('./admin');
+
+const router = express.Router();
+
+router.use('/auth', authRoutes);
+router.use('/users', userRoutes);
+router.use('/passwords', passwordRoutes);
+router.use('/categories', categoryRoutes);
+router.use('/tools', toolsRoutes);
+router.use('/admin', adminRoutes);
+
+// 健康检查端点
+router.get('/health', (req, res) => {
+  res.status(200).json({
+    status: 'ok',
+    message: 'Everything is fine!',
+    timestamp: new Date().toISOString(),
+  });
+})
+
+// 主页路由
 router.get('/', function (req, res, next) {
   res.json({
     message: 'Hello, World!',
   });
 });
 
+// 记录点击事件
 router.post('/api/record-click', (req, res) => {
   const data = { ...req.body, ip: req.ip };
 
@@ -27,5 +53,6 @@ router.post('/api/record-click', (req, res) => {
 
   res.sendStatus(200);
 });
+
 
 module.exports = router;
