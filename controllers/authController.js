@@ -1,6 +1,6 @@
 const bcrypt = require('bcrypt');
 const crypto = require('crypto');
-const { User, Session } = require('../models');
+const { User, Category, Session, sequelize } = require('../models');
 const { validationResult } = require('express-validator');
 const { parseUserAgent } = require('../utils/deviceParser');
 const { generateToken, verifyToken } = require('../services/authService');
@@ -13,9 +13,14 @@ const jwt = require('jsonwebtoken');
 const authController = {
     // 用户注册
     async register(req, res) {
+
+        // 开启事务支持
+        const transaction = await sequelize.transaction();
+
         try {
             const errors = validationResult(req);
             if (!errors.isEmpty()) {
+                await transaction.rollback();
                 return createSuccessResponse(res, 400, 'Validation failed', errors.array());
             }
 
@@ -25,10 +30,11 @@ const authController = {
             const existingUser = await User.findOne({
                 where: {
                     [Op.or]: [{ username }, { email }]
-                }
-            });
+                },
+            }, { transaction });
 
             if (existingUser) {
+                await transaction.rollback();
                 return createFailResponse(res, 409, 'Username or email already exists');
             }
 
@@ -43,7 +49,18 @@ const authController = {
                 passwordHash,
                 salt,
                 masterPasswordHint
-            });
+            }, { transaction });
+
+            // 为新用户创建默认分类(相当于密码记录的初始容器)
+            await Category.create({
+                userId: newUser.id,
+                name: 'General',
+                color: '#95a5a6',
+                icon: 'folder',
+                isDefault: true // 设置为默认分类 默认 false
+            }, { transaction })
+
+            await transaction.commit(); // 提交事务
 
             // 记录安全日志
             await logSecurityEvent(newUser.id, 'account_created', {
@@ -64,10 +81,13 @@ const authController = {
                 token
             });
         } catch (error) {
+            await transaction.rollback();
             console.error('Error during registration:', error);
             return createFailResponse(res, 500, 'Internal server error');
         }
     },
+
+    // https://chat.z.ai/s/102d9779-543a-43c4-b16d-3e5aaf0b12ec
 
     // 用户登录
     async login(req, res) {

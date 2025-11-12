@@ -26,7 +26,7 @@ const sessionController = {
         }
     },
 
-    // 远程注销指定会话
+    // 注销指定会话
     async deleteById(req, res) {
         try {
             const { id } = req.params;
@@ -54,7 +54,7 @@ const sessionController = {
             }
 
             // 更新会话状态为非活跃
-            await sessionToRevoke.update({ isActive: false }); // 软删除, 保留审计记录
+            await sessionToRevoke.update({ isActive: false });
             // TODO: 考虑是否需要彻底删除会话记录，取决于业务需求和隐私保护策略。
             // await sessionToRevoke.destroy();
 

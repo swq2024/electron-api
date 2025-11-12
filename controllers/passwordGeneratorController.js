@@ -1,4 +1,5 @@
 const { generateRandomPassword } = require('../services/encryptionService');
+const { calculatePasswordStrength } = require('../services/passwordService')
 const { createSuccessResponse, createFailResponse } = require('../utils/response');
 
 const passwordGeneratorController = {

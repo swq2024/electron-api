@@ -31,10 +31,10 @@ const authenticate = async (req, res, next) => {
             return createFailResponse(res, 401, 'Invalid or expired token');
         }
 
-        // 检查令牌是否已被列入黑名单（例如，用户已登出）
+        // 检查令牌是否已被列入黑名单（例如，用户已登出或注销session）
         const isInBlacklist = await isBlacklisted(decoded.jti);
         if (isInBlacklist) {
-            return createFailResponse(res, 401, 'Token has been revoked((logged out), please login again)');
+            return createFailResponse(res, 401, 'Token has been revoked');
         }
 
         const user = await User.findByPk(decoded.userId); // 根据令牌中的用户ID查找用户

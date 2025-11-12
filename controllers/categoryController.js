@@ -9,7 +9,7 @@ const categoryController = {
         try {
             const errors = validationResult(req);
             if (!errors.isEmpty()) {
-                return createFailResponse(res, errors.array()[0].msg);
+                return createFailResponse(res, 400, 'Validation failed', errors.array());
             }
 
             const { name, color, icon } = req.body;

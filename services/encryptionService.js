@@ -25,8 +25,8 @@ function encrypt(text, salt) {
         let encrypted = cipher.update(text, 'utf8', 'hex');
         encrypted += cipher.final('hex');
 
-        // 返回加密后的文本和IV（用于解密）
-        return { encryptedText: encrypted, iv: iv.toString('hex') };
+        // 返回IV和加密文本的组合
+        return iv.toString('hex') + ':' + encrypted;
     } catch (error) {
         console.error('Error encrypting text:', error);
         throw new Error('Encryption failed');
@@ -36,23 +36,24 @@ function encrypt(text, salt) {
 /**
  * 解密文本
  * @param {string} encryptedText 加密后的文本
- * @param {string} ivHexString 初始化向量的十六进制字符串
  * @param {string} salt 盐值，用于密钥派生
  * @returns {string} 解密后的文本
  */
-function decrypt(encryptedText, ivHexString, salt) {
+function decrypt(encryptedText, salt) {
     try {
-        // 将IV从十六进制字符串转换回Buffer
-        const iv = Buffer.from(ivHexString, 'hex');
-
         // 使用PBKDF2从盐值派生密钥
         const key = crypto.pbkdf2Sync(salt, salt, 100000, keyLength, 'sha256');
+
+        // 从加密文本中提取IV和实际加密内容
+        const textParts = encryptedText.split(':');
+        const iv = Buffer.from(textParts.shift(), 'hex');
+        const encrypted = textParts.join(':');
 
         // 创建解密器
         const decipher = crypto.createDecipheriv(algoritmo, key, iv);
 
         // 解密文本 (使用utf8编码，并以十六进制格式输出)
-        let decrypted = decipher.update(encryptedText, 'hex', 'utf8');
+        let decrypted = decipher.update(encrypted, 'hex', 'utf8');
         decrypted += decipher.final('utf8');
 
         return decrypted;
@@ -108,4 +109,8 @@ function generateRandomPassword(length = 12, options = {}) {
     return password;
 }
 
-module.exports = { encrypt, decrypt, generateRandomPassword };
+module.exports = {
+    encrypt,
+    decrypt,
+    generateRandomPassword
+};

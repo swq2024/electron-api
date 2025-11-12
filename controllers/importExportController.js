@@ -1,6 +1,7 @@
 const { Password, Category } = require('../models');
 const { encrypt, decrypt } = require('../services/encryptionService');
-const { createResponse, createErrorResponse } = require('../utils/response');
+const { calculatePasswordStrength } = require('../services/passwordService');
+const { createSuccessResponse, createFailResponse } = require('../utils/response');
 const { logSecurityEvent } = require('../utils/logger');
 const csv = require('csv-parser');
 const fs = require('fs');
@@ -9,7 +10,10 @@ const importExportController = {
     // 导出密码
     async export(req, res) {
         try {
-            const { id: userId } = req.user;
+            const {
+                id: userId,
+                salt: userSalt
+            } = req.user;
             const { format = 'json', categoryId } = req.query;
 
             // 构建查询条件
@@ -37,7 +41,7 @@ const importExportController = {
             // 解密密码
             const decryptedPasswords = passwords.map(password => {
                 const passwordData = password.toJSON();
-                passwordData.password = decrypt(passwordData.encryptedPassword, req.user.salt);
+                passwordData.password = decrypt(passwordData.encryptedPassword, userSalt);
                 delete passwordData.encryptedPassword;
                 delete passwordData.userId;
                 return passwordData;
@@ -60,13 +64,13 @@ const importExportController = {
                 return res.send(csvData);
             } else {
                 // 返回JSON格式
-                return createResponse(res, 200, 'Passwords exported successfully', {
+                return crea(res, 200, 'Passwords exported successfully', {
                     passwords: decryptedPasswords
                 });
             }
         } catch (error) {
             console.error('Export passwords error:', error);
-            return createErrorResponse(res, 500, 'Internal server error');
+            return createFailResponse(res, 500, 'Internal server error');
         }
     },
 
@@ -88,7 +92,7 @@ const importExportController = {
             });
 
             if (format === 'json' && !passwords) {
-                return createErrorResponse(res, 400, 'Passwords data is required for JSON import');
+                return createFailResponse(res, 400, 'Passwords data is required for JSON import');
             }
 
             let importedPasswords = [];
@@ -248,7 +252,7 @@ const importExportController = {
                                 // 删除临时文件
                                 fs.unlinkSync(req.file.path);
 
-                                resolve(createResponse(res, 200, 'Passwords imported successfully', {
+                                resolve(createSuccessResponse(res, 200, 'Passwords imported successfully', {
                                     imported: importedPasswords.length,
                                     passwords: importedPasswords
                                 }));
@@ -258,16 +262,16 @@ const importExportController = {
                         });
                 });
             } else {
-                return createErrorResponse(res, 400, 'Invalid import format');
+                return createFailResponse(res, 400, 'Invalid import format');
             }
 
-            return createResponse(res, 200, 'Passwords imported successfully', {
+            return createSuccessResponse(res, 200, 'Passwords imported successfully', {
                 imported: importedPasswords.length,
                 passwords: importedPasswords
             });
         } catch (error) {
             console.error('Import passwords error:', error);
-            return createErrorResponse(res, 500, 'Internal server error');
+            return createFailResponse(res, 500, 'Internal server error');
         }
     }
 };
@@ -293,24 +297,4 @@ function convertToCSV(data) {
     return [csvHeaders, ...csvRows].join('\n');
 }
 
-// 计算密码强度的辅助函数
-function calculatePasswordStrength(password) {
-    if (!password) return 0;
-
-    let strength = 0;
-
-    // 长度检查
-    if (password.length >= 8) strength += 1;
-    if (password.length >= 12) strength += 1;
-
-    // 复杂性检查
-    if (/[a-z]/.test(password)) strength += 1; // 小写字母
-    if (/[A-Z]/.test(password)) strength += 1; // 大写字母
-    if (/[0-9]/.test(password)) strength += 1; // 数字
-    if (/[^a-zA-Z0-9]/.test(password)) strength += 1; // 特殊字符
-
-    // 返回0-5的强度值
-    return Math.min(strength, 5);
-}
-
-module.exports = importExportController;
+module.exports = importExportController
