@@ -49,7 +49,6 @@ const adminController = {
                     const passwordCount = await Password.count({
                         where: {
                             userId: user.id,
-                            isDeleted: false
                         }
                     });
 
@@ -158,16 +157,14 @@ const adminController = {
             const vipUsers = await User.count({ where: { role: 'vip' } });
 
             // 密码统计
-            const totalPasswords = await Password.count({ where: { isDeleted: false } });
+            const totalPasswords = await Password.count();
             const strongPasswords = await Password.count({
                 where: {
-                    isDeleted: false,
                     passwordStrength: { [Op.gte]: 4 } // 密码强度评分大于等于4为强密码
                 }
             });
             const weakPasswords = await Password.count({
                 where: {
-                    isDeleted: false,
                     passwordStrength: { [Op.lte]: 2 } // 密码强度评分小于等于2为弱密码
                 }
             });

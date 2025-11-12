@@ -57,11 +57,6 @@ module.exports = (sequelize, DataTypes) => {
       defaultValue: false,
       field: 'is_favorite'
     },
-    isDeleted: {
-      type: DataTypes.BOOLEAN,
-      defaultValue: false,
-      field: 'is_deleted'
-    },
     customFields: {
       type: DataTypes.JSON,
       defaultValue: {},
@@ -79,10 +74,22 @@ module.exports = (sequelize, DataTypes) => {
     expiresAt: {
       type: DataTypes.DATE,
       field: 'expires_at'
+    },
+    createdAt: {
+      allowNull: true,
+      type: DataTypes.DATE
+    },
+    updatedAt: {
+      allowNull: true,
+      type: DataTypes.DATE
+    },
+    deletedAt: {
+      type: DataTypes.DATE
     }
   }, {
     sequelize,
-    modelName: 'Password'
+    modelName: 'Password',
+    paranoid: true // 启用软删除
   });
   return Password;
 };

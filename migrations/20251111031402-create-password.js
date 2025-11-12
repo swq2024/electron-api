@@ -53,11 +53,9 @@ module.exports = {
         field: 'is_favorite',
         comment: '是否为收藏'
       },
-      isDeleted: {
-        type: Sequelize.BOOLEAN,
-        defaultValue: false,
-        field: 'is_deleted',
-        comment: '是否已删除'
+      deletedAt: {
+        type: Sequelize.DATE,
+        field: 'deleted_at',
       },
       customFields: {
         type: Sequelize.JSON,

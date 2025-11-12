@@ -1,4 +1,5 @@
 const express = require('express');
+const { query } = require('express-validator');
 const multer = require('multer');
 
 const passwordGeneratorConroller = require('../controllers/passwordGeneratorController');
@@ -14,7 +15,16 @@ router.use(authenticate);
 router.post('/passwordGenerator', passwordGeneratorConroller.generate);
 
 // 密码导出
-router.get('/export', importExportController.export);
+router.get('/export', [
+    query('format')
+        .optional()
+        .isIn(['json', 'csv'])
+        .withMessage('Invalid format. Supported formats: json, csv'),
+    query('categoryId')
+        .optional()
+        .isUUID()
+        .withMessage('Invalid categoryId')
+], importExportController.export);
 
 
 // 密码导入

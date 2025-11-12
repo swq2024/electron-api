@@ -24,10 +24,11 @@ module.exports = (sequelize, DataTypes) => {
       allowNull: false,
       field: 'user_id'
     },
-    token: {
+    jti: {
       type: DataTypes.STRING,
       allowNull: false,
-      unique: true
+      unique: true, // 确保每个jti只对应一个会话记录
+      comment: 'JWT ID for blacklisting purposes' // 用于黑名单的JWT ID
     },
     deviceInfo: {
       type: DataTypes.JSON,

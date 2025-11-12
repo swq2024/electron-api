@@ -6,6 +6,7 @@ const userRoutes = require('./users');
 const passwordRoutes = require('./passwords');
 const categoryRoutes = require('./categories');
 const toolsRoutes = require('./tools');
+const seesionRoutes = require('./sessions');
 const adminRoutes = require('./admin');
 
 const router = express.Router();
@@ -15,6 +16,7 @@ router.use('/users', userRoutes);
 router.use('/passwords', passwordRoutes);
 router.use('/categories', categoryRoutes);
 router.use('/tools', toolsRoutes);
+router.use('/sessions', seesionRoutes);
 router.use('/admin', adminRoutes);
 
 // 健康检查端点

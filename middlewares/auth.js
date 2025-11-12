@@ -32,7 +32,8 @@ const authenticate = async (req, res, next) => {
         }
 
         // 检查令牌是否已被列入黑名单（例如，用户已登出）
-        if(await isBlacklisted(decoded.jti)) {
+        const isInBlacklist = await isBlacklisted(decoded.jti);
+        if (isInBlacklist) {
             return createFailResponse(res, 401, 'Token has been revoked((logged out), please login again)');
         }
 

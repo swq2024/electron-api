@@ -2,7 +2,7 @@ const { Password, PasswordHistory } = require('../models');
 const { validationResult } = require('express-validator');
 const { createSuccessResponse, createFailResponse } = require('../utils/response');
 const { encrypt, decrypt } = require('../services/encryptionService');
-const { calculatePasswordStrength } = require('../services/passwordUtils')
+const { calculatePasswordStrength } = require('../services/passwordService')
 const { logSecurityEvent } = require('../utils/logger');
 const { Op } = require('sequelize');
 
@@ -74,7 +74,6 @@ const passwordController = {
             // 构建查询条件
             const whereClause = {
                 userId,
-                isDeleted: false
             };
             if (categoryId) {
                 whereClause.categoryId = categoryId;
@@ -136,7 +135,6 @@ const passwordController = {
                 where: {
                     id,
                     userId,
-                    isDeleted: false
                 },
                 include: [
                     {
@@ -207,7 +205,6 @@ const passwordController = {
                 where: {
                     id,
                     userId,
-                    isDeleted: false
                 }
             });
 
@@ -268,7 +265,6 @@ const passwordController = {
                 where: {
                     id,
                     userId,
-                    isDeleted: false
                 }
             });
 
@@ -277,7 +273,7 @@ const passwordController = {
             }
 
             // 软删除
-            await password.update({ isDeleted: true });
+            await Password.destroy({ where: { id } });
 
             // 记录安全日志
             await logSecurityEvent(userId, 'password_deleted', {
@@ -307,7 +303,6 @@ const passwordController = {
                 where: {
                     id,
                     userId,
-                    isDeleted: false
                 }
             });
 
@@ -335,7 +330,137 @@ const passwordController = {
             console.error('Get password history error:', error);
             return createFailResponse(res, 500, 'Internal server error');
         }
-    }
+    },
+
+    // 获取回收站中的所有密码记录
+    async getAllTrash(req, res) {
+        try {
+            const { id: userId } = req.user;
+            const { page = 1, limit = 20 } = req.query;
+
+            const offset = (page - 1) * limit;
+
+            // 获取用户所有已删除的密码记录
+            const { count, rows: deletedPasswords } = await Password.findAndCountAll({
+                where: {
+                    userId,
+                    deleteAt: { [Op.not]: null } // 只查询软删除的记录
+                },
+                attributes: ['id', 'title', 'deletedAt'],
+                order: [['deletedAt', 'DESC']],
+                limit: limit,
+                offset
+            });
+
+            return createSuccessResponse(res, 200, 'Deleted passwords retrieved successfully', {
+                passwords: deletedPasswords,
+                pagination: {
+                    total: count,
+                    page: parseInt(page),
+                    limit: parseInt(limit),
+                    totalPages: Math.ceil(count / limit)
+                }
+            });
+        } catch (error) {
+            console.error('Get trashed passwords error:', error);
+            return createFailResponse(res, 500, 'Internal server error');
+        }
+    },
+
+    // 还原指定密码记录
+    async restore(req, res) {
+        try {
+            const { id } = req.params;
+            const { id: userId } = req.user;
+
+            // 查找并还原密码记录
+            const passwordToRestore = await Password.findOne({
+                where: {
+                    id,
+                    userId,
+                    deleteAt: { [Op.not]: null } // 只还原软删除的记录
+                }
+            });
+
+            if (!passwordToRestore) {
+                return createFailResponse(res, 404, 'Password not found in trash');
+            }
+
+            // 还原密码记录
+            await Password.restore({ where: { id } });
+
+            return createSuccessResponse(res, 200, 'Password restored successfully');
+        } catch (error) {
+            console.error('Restore password error:', error);
+            return createFailResponse(res, 500, 'Internal server error');
+        }
+    },
+
+    // 还原全部密码记录
+    async restoreAll(req, res) {
+        try {
+            const { ids } = req.body;
+            const { id: userId } = req.user;
+
+            // 批量还原密码记录
+            await Password.restore({
+                where: {
+                    id: ids,
+                    userId,
+                    deleteAt: { [Op.not]: null } // 只还原软删除的记录
+                }
+            });
+
+            return createSuccessResponse(res, 200, 'Passwords restored successfully');
+        } catch (error) {
+            console.error('Restore passwords error:', error);
+            return createFailResponse(res, 500, 'Internal server error');
+        }
+    },
+
+    // 永久删除密码记录
+    async deletePermanently(req, res) {
+        try {
+            const { id } = req.params;
+            const { id: userId } = req.user;
+
+            // 查找并永久删除密码记录
+            const result = await Password.destroy({
+                where: {
+                    id,
+                    userId,
+                    deleteAt: { [Op.not]: null } // 只删除软删除的记录
+                },
+                focus: true, // 强制删除，忽略软删除标志
+            });
+
+            if (result === 0) {
+                return createFailResponse(res, 404, 'Password not found in trash');
+            }
+
+            return createSuccessResponse(res, 200, 'Password deleted permanently');
+        } catch (error) {
+
+        }
+    },
+
+    // 清空回收站(永久删除所有密码记录)
+    async emptyTrash(req, res) {
+        try {
+            const { id: userId } = req.user;
+            // 查找并永久删除所有软删除的密码记录
+            await Password.destroy({
+                where: {
+                    userId,
+                    deleteAt: { [Op.not]: null } // 只删除软删除的记录
+                },
+                focus: true, // 强制删除，忽略软删除标志
+            });
+            return createSuccessResponse(res, 200, 'Trash emptied successfully');
+        } catch (error) {
+
+        }
+    },
 }
 
 module.exports = passwordController;

@@ -15,7 +15,6 @@ const importExportController = {
             // 构建查询条件
             const whereClause = {
                 userId,
-                isDeleted: false
             };
 
             if (categoryId) {
@@ -109,7 +108,6 @@ const importExportController = {
                                 userId,
                                 title: passwordData.title,
                                 username: passwordData.username || '',
-                                isDeleted: false
                             }
                         });
 
@@ -190,7 +188,6 @@ const importExportController = {
                                                 userId,
                                                 title: passwordData.title,
                                                 username: passwordData.username || '',
-                                                isDeleted: false
                                             }
                                         });
 

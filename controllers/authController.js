@@ -1,12 +1,14 @@
 const bcrypt = require('bcrypt');
 const crypto = require('crypto');
-const { User } = require('../models');
+const { User, Session } = require('../models');
 const { validationResult } = require('express-validator');
+const { parseUserAgent } = require('../utils/deviceParser');
 const { generateToken, verifyToken } = require('../services/authService');
 const { addToBlacklist } = require('../services/blacklistService');
 const { createSuccessResponse, createFailResponse } = require('../utils/response');
 const { logSecurityEvent } = require('../utils/logger');
 const { Op } = require('sequelize');
+const jwt = require('jsonwebtoken');
 
 const authController = {
     // 用户注册
@@ -152,14 +154,28 @@ const authController = {
                 lastLogin: new Date() // 记录最后登录时间
             });
 
+            // 生成JWT令牌并返回用户信息
+            const token = generateToken(user.id, user.role);
+            const decoded = jwt.decode(token); // 解码JWT以获取用户信息, 包含jti和exp
+
+            // 记录会话信息
+            const deviceInfo = parseUserAgent(req.get('User-Agent')); // 解析用户代理字符串以获取设备信息
+            await Session.create({
+                userId: user.id,
+                jti: decoded.jti,
+                deviceInfo,
+                ipAddress: req.ip,
+                userAgent: req.get('User-Agent'),
+                expiresAt: new Date(decoded.exp * 1000) // 将JWT的过期时间转换为毫秒并设置为会话记录的过期时间
+            })
+
+
             // 记录登录成功的安全日志
             await logSecurityEvent(user.id, 'login', {
                 ip: req.ip,
                 userAgent: req.get('User-Agent')
             });
 
-            // 生成JWT令牌并返回用户信息
-            const token = generateToken(user.id, user.role);
             return createSuccessResponse(res, 200, 'Login successful', {
                 user: {
                     id: user.id,
@@ -195,10 +211,10 @@ const authController = {
 
             // 计算令牌剩余的有效时间（秒）
             const now = Math.floor(Date.now() / 1000); // 当前时间戳（秒）
-            const expiresIn = decoded.exp - now; // 令牌剩余的有效时间（秒）
+            const expiresIn = decoded.exp - now;
 
             if (expiresIn > 0) {
-                // 将令牌添加到黑名单，并设置过期时间
+                // 将令牌添加到黑名单，并设置过期时间等于剩余的有效时间，这样可以确保在令牌完全失效之前阻止其使用。
                 await addToBlacklist(token, expiresIn);
             }
 

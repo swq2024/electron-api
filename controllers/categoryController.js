@@ -62,9 +62,6 @@ const categoryController = {
                         model: Password,
                         as: 'passwords',
                         attributes: ['id'],
-                        where: {
-                            isDeleted: false,
-                        },
                         required: false, // 即使没有密码，也返回分类
                     }
                 ],
@@ -170,8 +167,7 @@ const categoryController = {
             // 检查是否有密码使用此分类
             const passwordsCount = await Password.count({
                 where: {
-                    categoryId,
-                    isDeleted: false
+                    categoryId
                 }
             });
 

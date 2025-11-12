@@ -14,11 +14,11 @@ module.exports = {
         allowNull: false,
         field: 'user_id',
       },
-      token: {
+      jti: {
         type: Sequelize.STRING,
         allowNull: false,
         unique: true,
-        comment: '会话标识'
+        comment: 'JWT ID'
       },
       deviceInfo: {
         type: Sequelize.JSON,
