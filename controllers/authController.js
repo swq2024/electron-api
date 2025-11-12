@@ -87,8 +87,6 @@ const authController = {
         }
     },
 
-    // https://chat.z.ai/s/102d9779-543a-43c4-b16d-3e5aaf0b12ec
-
     // 用户登录
     async login(req, res) {
         try {

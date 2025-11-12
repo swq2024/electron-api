@@ -1,5 +1,6 @@
 const { join } = require('path');
 const fs = require('fs');
+const dotenvx = require('@dotenvx/dotenvx')
 
 function loadEnv() {
     const env = process.env.NODE_ENV || 'development';
@@ -16,8 +17,8 @@ function loadEnv() {
     for (let i = envFiles.length - 1; i >= 0; i--) {
         const file = envFiles[i];
         if (fs.existsSync(file)) {
-            // 加载
-            require('@dotenvx/dotenvx').config({
+            // 加载环境变量文件, 并解析私钥文件
+            dotenvx.config({
                 path: file,
                 // 加载私钥文件
                 envKeysFile: join(basePath, '.env.keys'),

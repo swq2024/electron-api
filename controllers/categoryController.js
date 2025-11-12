@@ -1,7 +1,8 @@
-const { Category, Password } = require('../models');
+const { Category, Password, sequelize } = require('../models');
 const { validationResult } = require('express-validator');
 const { createSuccessResponse, createFailResponse } = require('../utils/response');
 const { Op } = require('sequelize');
+const { logSecurityEvent } = require('../utils/logger');
 
 const categoryController = {
     // 创建分类
@@ -26,7 +27,7 @@ const categoryController = {
                 return createFailResponse(res, 409, 'Category with this name already exists');
             }
 
-            // 创建分类并记录安全日志
+            // 创建分类
             const newCategory = await Category.create({
                 userId,
                 name,
@@ -90,7 +91,7 @@ const categoryController = {
         try {
             const errors = validationResult(req);
             if (!errors.isEmpty()) {
-                return createFailResponse(res, 'Validation failed', errors.array());
+                return createFailResponse(res, 400, 'Validation failed', errors.array());
             }
 
             const { id: categoryId } = req.params;
@@ -120,7 +121,7 @@ const categoryController = {
                     where: {
                         name,
                         userId,
-                        id: { [Op.ne]: id } // 排除当前正在更新的分类，以避免冲突检查自身
+                        id: { [Op.ne]: categoryId } // 排除当前正在更新的分类，以避免冲突检查自身
                     }
                 });
                 if (duplicateCategory) {
@@ -144,6 +145,11 @@ const categoryController = {
     // 删除分类
     async delete(req, res) {
         try {
+            const errors = validationResult(req);
+            if (!errors.isEmpty()) {
+                return createFailResponse(res, 400, 'Validation failed', errors.array());
+            }
+
             const { id: categoryId } = req.params;
             const { id: userId } = req.user;
 
@@ -182,6 +188,72 @@ const categoryController = {
             return createSuccessResponse(res, 200, 'Category deleted successfully');
         } catch (error) {
             console.error('Delete category error:', error);
+            return createFailResponse(res, 500, 'Internal server error');
+        }
+    },
+
+    // 设置指定分类为用户的默认分类
+    async setDefaulteCategory(req, res) {
+        // 开启事务处理
+        const transaction = await sequelize.transaction();
+
+        try {
+            const errors = validationResult(req);
+            if (!errors.isEmpty()) {
+                return createFailResponse(res, 400, 'Validation failed', errors.array());
+            }
+
+            const { id: newDefaultCategoryId } = req.params; // 新默认分类的ID
+            const { id: userId } = req.user;
+
+            // 检查新默认分类是否存在并属于当前用户
+            const categoryToSet = await Category.findOne({
+                where: {
+                    id: newDefaultCategoryId,
+                    userId
+                }
+            }, { transaction });
+
+            if (!categoryToSet) {
+                await transaction.rollback();
+                return createFailResponse(res, 404, 'Category not found or does not belong to you');
+            }
+
+            // 如果这个分类已经是默认的，则无需更改
+            if (categoryToSet.isDefault) {
+                await transaction.commit();
+                return createSuccessResponse(res, 200, 'Category is already the default');
+            }
+
+            // 查找当前默认分类并更新为非默认
+            await Category.update(
+                { isDefault: false }, // 更新字段为非默认
+                {
+                    where: {
+                        userId,
+                        isDefault: true // 查找当前默认分类
+                    },
+                },
+                { transaction }
+            )
+
+            // 将新分类设置为默认
+            await categoryToSet.update({ isDefault: true }, { transaction });
+
+            // 记录安全日志
+            await logSecurityEvent(userId, 'default_category_changed', {
+                newDefaultCategoryId,
+                ip: req.ip,
+                userAgent: req.get('User-Agent')
+            }, { transaction });
+
+            // 提交事务
+            await transaction.commit();
+
+            return createSuccessResponse(res, 200, 'Default category set successfully');
+        } catch (error) {
+            await transaction.rollback();
+            console.error('Set default category error:', error);
             return createFailResponse(res, 500, 'Internal server error');
         }
     }

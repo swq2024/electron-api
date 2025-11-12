@@ -19,6 +19,13 @@ router.use('/tools', toolsRoutes);
 router.use('/sessions', seesionRoutes);
 router.use('/admin', adminRoutes);
 
+// 主页路由
+router.get('/', function (req, res, next) {
+  res.json({
+    message: 'Hello, World!',
+  });
+});
+
 // 健康检查端点
 router.get('/health', (req, res) => {
   res.status(200).json({
@@ -27,13 +34,6 @@ router.get('/health', (req, res) => {
     timestamp: new Date().toISOString(),
   });
 })
-
-// 主页路由
-router.get('/', function (req, res, next) {
-  res.json({
-    message: 'Hello, World!',
-  });
-});
 
 // 记录点击事件
 router.post('/api/record-click', (req, res) => {

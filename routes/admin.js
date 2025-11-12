@@ -37,17 +37,17 @@ router.get('/users', [
 router.put('/users/:id/role', [
     param('id')
         .isUUID()
-        .withMessage('User ID must be a valid UUID'),
+        .withMessage('Invalid user ID'),
     body('role')
-        .isIn(['admin', 'user', 'vip'])
-        .withMessage('Role must be admin, user, or vip')
+        .isIn(['user', 'vip'])
+        .withMessage('Role must be user or vip')
 ], adminController.updateUserRole);
 
 // 禁用/启用用户
 router.put('/users/:id/status', [
     param('id')
         .isUUID()
-        .withMessage('User ID must be a valid UUID'),
+        .withMessage('Invalid user ID'),
     body('isActive')
         .isBoolean()
         .withMessage('isActive must be a boolean')
@@ -73,12 +73,13 @@ router.get('/security-logs', [
     query('action')
         .optional()
         .isIn([
-            'login', 'logout', 'login_failed', 'password_changed', 'password_accessed',
-            'password_created', 'password_updated', 'password_deleted',
-            'account_created', 'account_updated', 'account_deleted',
-            'account_locked', 'account_unlocked', 'two_factor_enabled', 'profile_updated',
-            'two_factor_disabled', 'export_data', 'import_data', 'user_role_updated',
-            'user_enabled', 'user_disabled'
+            'login', 'logout', 'login_failed', 'password_changed',
+            'password_accessed', 'password_created', 'password_updated',
+            'password_deleted', 'account_created', 'account_locked',
+            'account_unlocked', 'two_factor_enabled', 'profile_updated',
+            'two_factor_disabled', 'export_data', 'import_data',
+            'user_role_updated', 'user_enabled', 'user_disabled',
+            'default_category_changed'
         ])
         .withMessage('Invalid action type')
 ], adminController.getAllSecurityLogs);

@@ -45,6 +45,15 @@ module.exports = (sequelize, DataTypes) => {
   }, {
     sequelize,
     modelName: 'Category',
+    indexes: [
+      {
+        unique: true,
+        fields: ['user_id', 'is_default'],
+        where: {
+          is_default: true // 只对 isDefault 为 true 的记录施加唯一约束, 确保每个用户只有一个默认分类
+        }
+      }
+    ]
   });
   return Category;
 };

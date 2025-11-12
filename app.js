@@ -6,11 +6,17 @@ const cookieParser = require('cookie-parser');
 const logger = require('morgan');
 const routes = require('./routes/index');
 const { errorHandler } = require('./middlewares/errorHandler');
+// const crypto = require('crypto');
+// // 生成随机字符串
+// console.log(crypto.randomBytes(32).toString('hex'));
 
 const loadEnv = require('./utils/loadEnv');
 loadEnv();
 
 const app = express();
+
+console.log(process.env.ADMIN_EMAIL);
+console.log(process.env.ADMIN_PASSWORD);
 
 // 安全中间件
 app.use(helmet())

@@ -18,8 +18,6 @@ function parseUserAgent(userAgent) {
     const parser = new UAParser(userAgent);
     const result = parser.getResult();
 
-    console.log('res', result);
-    
     // 特殊处理 Electron 环境
     // Electron 的 UA 通常包含 "Electron"，但 ua-parser-js 可能会将其识别为 Chrome
     const isElectron = userAgent.includes('Electron');

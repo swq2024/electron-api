@@ -3,6 +3,7 @@ const { validationResult } = require('express-validator');
 const { createSuccessResponse, createFailResponse } = require('../utils/response');
 const { logSecurityEvent } = require('../utils/logger');
 const { Op } = require('sequelize');
+const { parseBoolean } = require('../utils/parsers');
 
 const adminController = {
     // 获取用户列表
@@ -105,7 +106,10 @@ const adminController = {
                 userAgent: req.headers['user-agent']
             });
 
-            return createSuccessResponse(res, 200, 'User role updated successfully');
+            return createSuccessResponse(res, 200, 'User role updated successfully', {
+                userId: user.id,
+                newRole: role
+            });
         } catch (error) {
             console.error('Update user role error:', error);
             return createFailResponse(res, 500, 'Internal server error');
@@ -115,9 +119,16 @@ const adminController = {
     // 启用/禁用用户
     async toggleUserStatus(req, res) {
         try {
+            const errors = validationResult(req);
+            if (!errors.isEmpty()) {
+                return createFailResponse(res, 400, 'Validation error', errors.array());
+            }
+            
             const { id } = req.params;
-            const { isActive } = req.body; // isActive 为 true 或 false
+            const { isActive } = req.body;
             const { id: adminId } = req.user; // 获取当前管理员的ID
+
+            const parsedIsActive = parseBoolean(isActive);
 
             const user = await User.findByPk(id);
             if (!user) {
@@ -125,22 +136,22 @@ const adminController = {
             }
 
             // 防止管理员禁用自己的账户
-            if (adminId === user.id && !isActive) {
+            if (adminId === user.id && !parsedIsActive) {
                 return createFailResponse(res, 400, 'Cannot disable your own account');
             }
 
             // 更新用户状态
-            await user.update({ isActive });
-
+            await user.update({ isActive: parsedIsActive });
+            
             // 记录安全日志
-            await logSecurityEvent(adminId, isActive ? 'user_enabled' : 'user_disabled', {
+            await logSecurityEvent(adminId, parsedIsActive ? 'user_enabled' : 'user_disabled', {
                 targetUserId: user.id,
-                newStatus: isActive ? 'active' : 'inactive',
+                newStatus: parsedIsActive ? 'active' : 'inactive',
                 ip: req.ip,
                 userAgent: req.get('User-Agent')
             });
 
-            return createSuccessResponse(res, 200, `User ${isActive ? 'enabled' : 'disabled'} successfully`);
+            return createSuccessResponse(res, 200, `User ${parsedIsActive ? 'enabled' : 'disabled'} successfully`);
         } catch (error) {
             console.error('Toggle user status error:', error);
             return createFailResponse(res, 500, 'Internal server error');

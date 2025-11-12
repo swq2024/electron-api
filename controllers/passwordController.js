@@ -1,4 +1,4 @@
-const { Password, PasswordHistory } = require('../models');
+const { Password, PasswordHistory, Category } = require('../models');
 const { validationResult } = require('express-validator');
 const { createSuccessResponse, createFailResponse } = require('../utils/response');
 const { encrypt, decrypt } = require('../services/encryptionService');
@@ -21,6 +21,21 @@ const passwordController = {
                 salt: userSalt
             } = req.user;
 
+            // 如果没有categoryId，则使用用户注册时创建的默认分类
+            let findCategoryId = categoryId;
+            if (!findCategoryId) {
+                const defaultCategory = await Category.findOne({
+                    where: {
+                        userId,
+                        isDefault: true
+                    }
+                });
+                if (!defaultCategory) {
+                    return createFailResponse(res, 400, 'No default category found for the user');
+                }
+                findCategoryId = defaultCategory.id;
+            }
+
             // 加密密码
             const encryptedPassword = encrypt(password, userSalt);
 
@@ -31,7 +46,7 @@ const passwordController = {
             // 创建新密码记录
             const newPassword = await Password.create({
                 userId,
-                categoryId,
+                categoryId: findCategoryId,
                 title,
                 username,
                 encryptedPassword,

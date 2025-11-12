@@ -32,7 +32,7 @@ router.get('/', categoryController.getAll);
 router.put('/:id', [
     param('id')
         .isUUID()
-        .withMessage('Category ID must be a valid UUID'),
+        .withMessage('Invalid category ID'),
     body('name')
         .optional()
         .notEmpty()
@@ -53,7 +53,14 @@ router.put('/:id', [
 router.delete('/:id', [
     param('id')
         .isUUID()
-        .withMessage('Category ID must be a valid UUID')
+        .withMessage('Invalid category ID')
 ], categoryController.delete);
+
+// 设置指定分类为用户的默认分类
+router.put('/:id/set-default', [
+    param('id')
+        .isUUID()
+        .withMessage('Invalid category ID')
+], categoryController.setDefaulteCategory);
 
 module.exports = router;

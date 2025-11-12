@@ -26,12 +26,13 @@ module.exports = (sequelize, DataTypes) => {
     },
     action: {
       type: DataTypes.ENUM(
-        'login', 'logout', 'login_failed', 'password_changed', 'password_accessed',
-        'password_created', 'password_updated', 'password_deleted',
-        'account_created', 'account_updated', 'account_deleted',
-        'account_locked', 'account_unlocked', 'two_factor_enabled','profile_updated', 
-        'two_factor_disabled', 'export_data', 'import_data', 'user_role_updated',
-        'user_enabled', 'user_disabled'
+        'login', 'logout', 'login_failed', 'password_changed',
+        'password_accessed', 'password_created', 'password_updated',
+        'password_deleted', 'account_created', 'account_locked',
+        'account_unlocked', 'two_factor_enabled', 'profile_updated',
+        'two_factor_disabled', 'export_data', 'import_data',
+        'user_role_updated', 'user_enabled', 'user_disabled',
+        'default_category_changed'
       ),
       allowNull: false
     },
