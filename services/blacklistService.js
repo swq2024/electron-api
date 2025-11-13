@@ -1,5 +1,5 @@
 const redis = require('redis');
-const { verifyToken } = require('./authService')
+const { verifyToken } = require('./authService');
 
 // 创建 Redis 客户端
 const redisClient = redis.createClient({
@@ -27,6 +27,7 @@ const addToBlacklist = async (token, expiresIn) => {
   try {
     // 从令牌中提取jti
     const decoded = verifyToken(token);
+    
     if (!decoded || !decoded.jti) {
       console.error('Invalid token or missing jti for blacklisting.');
       return;
@@ -51,7 +52,7 @@ const isBlacklisted = async (jti) => {
     if (!jti) return false;
 
     const key = `${BLACKLIST_PREFIX}${jti}`;
-    const result = await redisClient.get(key);
+    const result = await redisClient.get(key); // 如果找到就返回true(此处true为string)，找不到就返回null
     return result === 'true';
   } catch (error) {
     console.error('Failed to check blacklist:', error);

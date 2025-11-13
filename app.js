@@ -15,8 +15,8 @@ loadEnv();
 
 const app = express();
 
-console.log(process.env.ADMIN_EMAIL);
-console.log(process.env.ADMIN_PASSWORD);
+// console.log(process.env.ADMIN_EMAIL);
+// console.log(process.env.ADMIN_PASSWORD);
 
 // 安全中间件
 app.use(helmet())

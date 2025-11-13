@@ -26,7 +26,7 @@ router.post('/', [
         .optional().isObject().withMessage('Custom fields must be an object')
 ], passwordController.create);
 
-// 获取所有密码存储列表
+// 获取所有密码存储
 router.get('/', [
     query('categoryId')
         .optional().isUUID().withMessage('Category ID must be a valid UUID if provided'),
@@ -52,11 +52,11 @@ router.get('/', [
         .withMessage('Sort order must be ASC or DESC')
 ], passwordController.getAll);
 
-// 获取单个密码存储详情
-router.get('/:id', [
+// 获取密码存储详情
+router.get('/:id/detail', [
     param('id')
         .isUUID()
-        .withMessage('Password ID must be a valid UUID')
+        .withMessage('Invalid password ID')
 ], passwordController.getById);
 
 // 更新密码存储记录
@@ -94,6 +94,9 @@ router.put('/:id', [
         .withMessage('Custom fields must be an object')
 ], passwordController.update);
 
+// 永久删除所有密码记录
+router.delete('/permanently-all', passwordController.deletePermanentlyAll);
+
 // 删除密码存储记录
 router.delete('/:id', [
     param('id')
@@ -101,11 +104,49 @@ router.delete('/:id', [
         .withMessage('Password ID must be a valid UUID')
 ], passwordController.delete);
 
+// 批量删除密码记录
+router.post('/delete-batch', [
+    body('ids')
+        .isArray()
+        .withMessage('Invalid ids format')
+], passwordController.deleteBatch);
+
 // 获取密码历史记录
 router.get('/:id/history', [
     param('id')
         .isUUID()
         .withMessage('Password ID must be a valid UUID')
 ], passwordController.getHistory);
+
+// 获取回收站中的密码
+router.get('/trash', passwordController.getAllTrash);
+
+// 还原指定密码记录
+router.post('/:id/restore', [
+    param('id')
+        .isUUID()
+        .withMessage('Invalid password ID')
+], passwordController.restore);
+
+// 还原全部密码记录
+router.post('/restore-all', [
+    body('ids')
+        .isArray()
+        .withMessage('Invalid ids format')
+], passwordController.restoreAll);
+
+// 永久删除密码记录
+router.delete('/:id/permanently', [
+    param('id')
+        .isUUID()
+        .withMessage('Invalid password ID')
+], passwordController.deletePermanently);
+
+// 批量永久删除密码记录
+router.post('/delete-batch-permanently', [
+    body('ids')
+        .isArray()
+        .withMessage('Invalid ids format')
+], passwordController.deleteBatchPermanently);
 
 module.exports = router;

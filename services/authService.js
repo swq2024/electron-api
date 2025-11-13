@@ -21,6 +21,7 @@ const generateToken = (userId, role) => {
 
 const verifyToken = (token) => {
     try {
+        // 返回解码后的令牌信息，但不包括签名部分。如果验证失败，将抛出错误。
         return jwt.verify(token, process.env.JWT_SECRET);
     } catch (error) {
         return null;

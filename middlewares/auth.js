@@ -7,8 +7,11 @@ const authenticate = async (req, res, next) => {
     try {
         const authHeader = req.headers['authorization'];
 
-        if (!authHeader || !authHeader.startsWith('Bearer')) {
+        if (!authHeader) {
             return createFailResponse(res, 401, 'Access token required');
+        }
+        if (!authHeader.startsWith('Bearer ')) {
+            return createFailResponse(res, 401, 'Invalid authorization header format');
         }
 
         const token = authHeader.substring(7); // 从Bearer Token中提取令牌值
@@ -44,7 +47,8 @@ const authenticate = async (req, res, next) => {
         }
 
         req.user = user; // 将用户信息附加到请求对象上 方便在后续中间件或路由处理函数中使用
-        req.token = token; // 登出时需要
+        req.token = token; // 登出时/注销会话时需要用到token
+        req.tokenJti = decoded.jti; // 注销会话时需要用到token的JTI（JWT ID）
 
         next();
     } catch (error) {

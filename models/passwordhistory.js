@@ -10,7 +10,11 @@ module.exports = (sequelize, DataTypes) => {
      * The `models/index` file will call this method automatically.
      */
     static associate(models) {
-      PasswordHistory.belongsTo(models.Password, { foreignKey: 'passwordId', as: 'password' });
+      PasswordHistory.belongsTo(models.Password, {
+        foreignKey: 'passwordId',
+        as: 'password',
+        onDelete: 'CASCADE' // 当密码被删除时，与之相关的密码历史记录也应被级联删除
+      });
     }
   }
   PasswordHistory.init({

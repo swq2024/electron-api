@@ -11,7 +11,7 @@ const router = express.Router();
 // 所有工具路由都需要认证
 router.use(authenticate);
 
-// 密码生成器路由
+// 密码生成器
 router.post('/passwordGenerator', passwordGeneratorConroller.generate);
 
 // 密码导出
@@ -25,7 +25,6 @@ router.get('/export', [
         .isUUID()
         .withMessage('Invalid categoryId')
 ], importExportController.export);
-
 
 // 密码导入
 const upload = multer({ dest: 'uploads/' });

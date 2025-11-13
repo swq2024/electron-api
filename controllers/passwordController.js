@@ -61,7 +61,7 @@ const passwordController = {
                 passwordId: newPassword.id,
                 ip: req.ip,
                 userAgent: req.get('User-Agent')
-            });
+            }, newPassword.id);
 
             return createSuccessResponse(res, 201, 'Password created successfully', {
                 id: newPassword.id,
@@ -109,7 +109,7 @@ const passwordController = {
                 where: whereClause,
                 include: [
                     {
-                        model: 'Category',
+                        model: Category,
                         as: 'category',
                         attributes: ['id', 'name', 'color', 'icon'],
                     }
@@ -137,10 +137,16 @@ const passwordController = {
         }
     },
 
-    // 获取单个密码存储详情
+    // 获取密码存储详情
     async getById(req, res) {
         try {
+            const errors = validationResult(req);
+            if (!errors.isEmpty()) {
+                return createFailResponse(res, 400, 'Validation failed', errors.array());
+            }
+
             const { id } = req.params;
+
             const {
                 id: userId,
                 salt: userSalt
@@ -153,7 +159,7 @@ const passwordController = {
                 },
                 include: [
                     {
-                        model: 'Category',
+                        model: Category,
                         as: 'category',
                         attributes: ['id', 'name', 'color', 'icon']
                     }
@@ -175,7 +181,7 @@ const passwordController = {
                 passwordId: password.id,
                 ip: req.ip,
                 userAgent: req.get('User-Agent')
-            });
+            }, id);
 
             return createSuccessResponse(res, 200, 'Password retrieved successfully', {
                 id: password.id,
@@ -260,7 +266,7 @@ const passwordController = {
                 passwordId: id,
                 ip: req.ip,
                 userAgent: req.get('User-Agent')
-            });
+            }, id);
 
             return createSuccessResponse(res, 200, 'Password updated successfully');
         } catch (error) {
@@ -272,6 +278,11 @@ const passwordController = {
     // 删除密码存储记录
     async delete(req, res) {
         try {
+            const errors = validationResult(req);
+            if (!errors.isEmpty()) {
+                return createFailResponse(res, 400, 'Validation failed', errors.array());
+            }
+
             const { id } = req.params;
             const { id: userId } = req.user;
 
@@ -295,11 +306,42 @@ const passwordController = {
                 passwordId: id,
                 ip: req.ip,
                 userAgent: req.get('User-Agent')
-            });
+            }, id);
 
             return createSuccessResponse(res, 200, 'Password deleted successfully');
         } catch (error) {
             console.error('Delete password error:', error);
+            return createFailResponse(res, 500, 'Internal server error');
+        }
+    },
+
+    // 批量删除密码记录
+    async deleteBatch(req, res) { // Express默认不会解析DELETE请求中的body, 所以这里需要使用POST请求
+        try {
+            const errors = validationResult(req);
+            if (!errors.isEmpty()) {
+                return createFailResponse(res, 400, 'Validation failed', errors.array());
+            }
+
+            const { ids } = req.body;
+            const { id: userId } = req.user;
+
+            // 批量删除密码记录
+            const affectRows = await Password.destroy({ where: { id: ids } });
+            if (affectRows === 0) {
+                return createFailResponse(res, 404, 'Please check your ids and try again[deleted-batch]');
+            }
+            // 记录安全日志
+            await logSecurityEvent(userId, 'password_deleted_batch', {
+                // 由于这个action是仅代表删除密码, 这里可标注批量删除相关信息
+                passwordIds: ids,
+                ip: req.ip,
+                userAgent: req.get('User-Agent')
+            });
+
+            return createSuccessResponse(res, 200, 'Passwords deleted-batch successfully');
+        } catch (error) {
+            console.error('Delete batch password error:', error);
             return createFailResponse(res, 500, 'Internal server error');
         }
     },
@@ -328,7 +370,7 @@ const passwordController = {
             // 获取密码历史记录
             const history = await PasswordHistory.findAll({
                 where: { passwordId: id },
-                order: [['createdAt', 'DESC']], // 按创建时间降序排序
+                order: [['changed_at', 'DESC']], // 按更改时间降序排列
             })
 
             // 解密历史记录中的密码
@@ -347,7 +389,7 @@ const passwordController = {
         }
     },
 
-    // 获取回收站中的所有密码记录
+    // 获取回收站中的密码
     async getAllTrash(req, res) {
         try {
             const { id: userId } = req.user;
@@ -359,12 +401,13 @@ const passwordController = {
             const { count, rows: deletedPasswords } = await Password.findAndCountAll({
                 where: {
                     userId,
-                    deleteAt: { [Op.not]: null } // 只查询软删除的记录
+                    deletedAt: { [Op.not]: null } // 只查询软删除的记录
                 },
                 attributes: ['id', 'title', 'deletedAt'],
                 order: [['deletedAt', 'DESC']],
                 limit: limit,
-                offset
+                offset,
+                paranoid: false, // 关闭软删除特性才能查询到软删除的记录
             });
 
             return createSuccessResponse(res, 200, 'Deleted passwords retrieved successfully', {
@@ -388,13 +431,15 @@ const passwordController = {
             const { id } = req.params;
             const { id: userId } = req.user;
 
+            console.log('id', id);
+
             // 查找并还原密码记录
             const passwordToRestore = await Password.findOne({
                 where: {
                     id,
                     userId,
-                    deleteAt: { [Op.not]: null } // 只还原软删除的记录
-                }
+                },
+                paranoid: false, // 关闭软删除特性才能查询到软删除的记录
             });
 
             if (!passwordToRestore) {
@@ -411,20 +456,27 @@ const passwordController = {
         }
     },
 
-    // 还原全部密码记录
+    // 批量还原密码记录
     async restoreAll(req, res) {
         try {
+            const errors = validationResult(req);
+            if (!errors.isEmpty()) {
+                return createFailResponse(res, 400, 'Invalid failed', errors.array());
+            }
+
             const { ids } = req.body;
             const { id: userId } = req.user;
 
             // 批量还原密码记录
-            await Password.restore({
+            const affectRows = await Password.restore({
                 where: {
-                    id: ids,
+                    id: ids, // 确保传入的是一个数组
                     userId,
-                    deleteAt: { [Op.not]: null } // 只还原软删除的记录
                 }
             });
+            if (affectRows === 0) {
+                return createFailResponse(res, 404, 'Please check your ids and try again[restoreAll]');
+            }
 
             return createSuccessResponse(res, 200, 'Passwords restored successfully');
         } catch (error) {
@@ -436,6 +488,11 @@ const passwordController = {
     // 永久删除密码记录
     async deletePermanently(req, res) {
         try {
+            const errors = validationResult(req);
+            if (!errors.isEmpty()) {
+                return createFailResponse(res, 400, 'Invalid failed', errors.array());
+            }
+
             const { id } = req.params;
             const { id: userId } = req.user;
 
@@ -444,36 +501,65 @@ const passwordController = {
                 where: {
                     id,
                     userId,
-                    deleteAt: { [Op.not]: null } // 只删除软删除的记录
                 },
-                focus: true, // 强制删除，忽略软删除标志
+                force: true, // 强制删除，忽略软删除标志
             });
 
             if (result === 0) {
                 return createFailResponse(res, 404, 'Password not found in trash');
             }
 
-            return createSuccessResponse(res, 200, 'Password deleted permanently');
+            return createSuccessResponse(res, 200, 'Password deleted permanently successfully');
         } catch (error) {
 
         }
     },
 
-    // 清空回收站(永久删除所有密码记录)
-    async emptyTrash(req, res) {
+    // 批量永久删除密码记录
+    async deleteBatchPermanently(req, res) {
+        try {
+            const errors = validationResult(req);
+            if (!errors.isEmpty()) {
+                return createFailResponse(res, 400, 'Invalid failed', errors.array());
+            }
+
+            const { ids } = req.body;
+            const { id: userId } = req.user;
+
+            // 批量永久删除密码记录
+            const affectRows = await Password.destroy({
+                where: {
+                    id: ids,
+                    userId,
+                },
+                force: true, // 强制删除，忽略软删除标志
+            });
+            if (affectRows === 0) {
+                return createFailResponse(res, 404, 'Please check your ids and try again[deleteBatchPermanently]');
+            }
+
+            return createSuccessResponse(res, 200, 'Passwords deleted permanently successfully');
+        } catch (error) {
+            console.error('Delete passwords permanently error:', error);
+            return createFailResponse(res, 500, 'Internal server error');
+        }
+    },
+
+    // 永久删除所有密码记录
+    async deletePermanentlyAll(req, res) {
         try {
             const { id: userId } = req.user;
-            // 查找并永久删除所有软删除的密码记录
+            // 查找当前用户的所有密码记录
             await Password.destroy({
                 where: {
                     userId,
-                    deleteAt: { [Op.not]: null } // 只删除软删除的记录
                 },
-                focus: true, // 强制删除，忽略软删除标志
+                force: true, // 强制删除，忽略软删除标志
             });
-            return createSuccessResponse(res, 200, 'Trash emptied successfully');
+            return createSuccessResponse(res, 200, 'All passwords deleted permanently successfully');
         } catch (error) {
-
+            console.error('Delete all passwords permanently error:', error);
+            return createFailResponse(res, 500, 'Internal server error');
         }
     },
 }

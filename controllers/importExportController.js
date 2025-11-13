@@ -64,7 +64,7 @@ const importExportController = {
                 return res.send(csvData);
             } else {
                 // 返回JSON格式
-                return crea(res, 200, 'Passwords exported successfully', {
+                return createSuccessResponse(res, 200, 'Passwords exported successfully', {
                     passwords: decryptedPasswords
                 });
             }
@@ -80,22 +80,23 @@ const importExportController = {
             const {
                 id: userId,
                 salt: userSalt
-            } = req.user.id;
-            const { format = 'json', passwords } = req.body;
-
-            // 记录安全日志
-            await logSecurityEvent(userId, 'import_data', {
-                format,
-                count: passwords ? passwords.length : 0,
-                ip: req.ip,
-                userAgent: req.get('User-Agent')
-            });
+            } = req.user;
+            // 这里的passwords 应该是一个数组，每个元素都是一个对象，包含密码的详细信息。例如：
+            // [
+            //     { title: 'Example', password: 'examplepassword', 'category': 'Example Category' },
+            //     // ... 其他密码条目
+            // ]
+            console.log('req.body', req.body);
+            const { format = 'json' } = req.body;
+            const passwords = [req.body];
 
             if (format === 'json' && !passwords) {
                 return createFailResponse(res, 400, 'Passwords data is required for JSON import');
             }
 
             let importedPasswords = [];
+
+
 
             if (format === 'json') {
                 // 处理JSON导入
@@ -116,10 +117,12 @@ const importExportController = {
                         });
 
                         if (existingPassword) {
+                            console.log('11111111111111111111');
+
                             continue; // 跳过重复条目
                         }
 
-                        // 查找或创建分类
+                        // 获取或创建分类
                         let categoryId = null;
                         if (passwordData.category) {
                             let category = await Category.findOne({
@@ -263,6 +266,16 @@ const importExportController = {
                 });
             } else {
                 return createFailResponse(res, 400, 'Invalid import format');
+            }
+
+            // 记录安全事件日志
+            if (importedPasswords.length) {
+                await logSecurityEvent(userId, 'import_data', {
+                    format,
+                    count: passwords ? passwords.length : 0,
+                    ip: req.ip,
+                    userAgent: req.get('User-Agent')
+                });
             }
 
             return createSuccessResponse(res, 200, 'Passwords imported successfully', {

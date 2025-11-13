@@ -6,6 +6,7 @@
 const app = require('../app');
 const debug = require('debug')('backend-service:server');
 const http = require('http');
+const { sequelize } = require('../models');
 
 /**
  * Get port from environment and store in Express.
@@ -28,13 +29,14 @@ server.on('listening', onListening);
 /**
  * 优雅退出：关闭服务和数据库连接
  */
-function gracefulShutdown() {
+async function gracefulShutdown() {
   server.close((err) => {
     if (err) {
       console.error('[Shutdown] Server close error:', err.message);
       process.exit(1); // 非0都为异常退出程序
     }
   })
+  await sequelize.close()
   console.log('[Shutdown] HTTP server closed');
   process.exit(0); // 正常关闭
 }

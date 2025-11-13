@@ -4,7 +4,7 @@ const { User, Category, Session, sequelize } = require('../models');
 const { validationResult } = require('express-validator');
 const { parseUserAgent } = require('../utils/deviceParser');
 const { generateToken, verifyToken } = require('../services/authService');
-const { addToBlacklist } = require('../services/blacklistService');
+const { addToBlacklist, isBlacklisted } = require('../services/blacklistService');
 const { createSuccessResponse, createFailResponse } = require('../utils/response');
 const { logSecurityEvent } = require('../utils/logger');
 const { Op } = require('sequelize');
@@ -90,7 +90,7 @@ const authController = {
     // 用户登录
     async login(req, res) {
         try {
-            const errors = validationResult(req); // 验证请求体中的数据
+            const errors = validationResult(req);
             if (!errors.isEmpty()) {
                 return createFailResponse(res, 400, 'Validation failed', errors.array());
             }
@@ -202,7 +202,7 @@ const authController = {
                     role: user.role,
                     twoFactorEnabled: user.twoFactorEnabled // 返回双因素认证状态信息，以便前端可以据此显示或隐藏相关UI元素
                 },
-                token
+                token // 前端通过npm install jwt-decode可以解析出jti和exp等信息，供前端显示会话活动信息，例如会话过期时间, 是否是当前设备。
             });
         } catch (error) {
             console.error('Error during login:', error);
@@ -217,14 +217,25 @@ const authController = {
 
             // 这里应该使JWT令牌失效，但由于JWT是无状态的，我们需要使用Redis的黑名单机制来阻止旧的令牌被再次使用。
             const token = req.token; // 从请求对象中获取JWT令牌
-            if (!token) {
-                return createFailResponse(res, 400, 'No token provided for logout operation');
+            const tokenJti = req.tokenJti; // 从请求对象中获取令牌的jti值，用于在黑名单中查找和删除该令牌
+
+            delete req.user; // 删除请求对象中的JWT令牌
+            delete req.tokenJti; // 删除请求对象中的令牌jti值
+
+            const currentSession = await Session.findOne({
+                where: {
+                    userId,
+                    jti: tokenJti
+                }
+            });
+
+            if (currentSession) {
+                await currentSession.update({ isActive: false });
             }
 
-            const decoded = verifyToken(token); // 验证JWT令牌的有效性
+            const decoded = verifyToken(token);
             if (!decoded) {
-                // 令牌已经无效，直接返回成功
-                return createSuccessResponse(res, 200, 'Logout successful (token was already invalid)');
+                return createSuccessResponse(res, 200, 'Logout successful (token was already invalid).');
             }
 
             // 计算令牌剩余的有效时间（秒）
@@ -252,17 +263,38 @@ const authController = {
     // 刷新JWT令牌
     async refreshToken(req, res) {
         try {
-            const { id: userId } = req.user; // 从请求对象中获取用户ID
-            const user = await User.findByPk(userId); // 根据用户ID查找用户信息
-
-            if (!user) {
-                return createFailResponse(res, 401, 'User not found');
+            const { id: userId } = req.user;
+            const authHeader = req.headers.authorization;
+            if (!authHeader || !authHeader.startsWith('Bearer ')) {
+                return createFailResponse(res, 401, 'Access token required for refresh');
             }
 
-            // 生成一个新的JWT令牌并返回给客户端。由于我们已经实现了黑名单机制，旧的令牌仍然有效直到它被添加到黑名单为止。
+            const token = authHeader.split(' ')[1]; // 从授权令牌中提取实际的JWT字符串（假设格式为"Bearer <token>"）
+            const decoded = verifyToken(token); // 验证JWT令牌的有效性并获取其内容
+            if (!decoded) {
+                return createFailResponse(res, 401, 'Invalid or expired token for refresh');
+            }
+
+            const isInBlacklist = await isBlacklisted(token);
+            if (isInBlacklist) {
+                return createFailResponse(res, 401, 'Token has been revoked, please login again');
+            }
+
+            const user = await User.findByPk(userId);
+            if (!user || !user.isActive) {
+                return createFailResponse(res, 401, 'User not found or inactive');
+            }
+
+            const now = Math.floor(Date.now() / 1000);
+            const expiresIn = decoded.exp - now;
+            if (expiresIn > 0) {
+                await addToBlacklist(token, expiresIn);
+            }
+
+            // 生成一个新的JWT令牌并返回给客户端。
             const newToken = generateToken(userId, user.role);
 
-            return createSuccessResponse(res, 200, 'Refresh token successful', {
+            return createSuccessResponse(res, 200, 'Token refreshed successfully', {
                 token: newToken
             });
         } catch (error) {

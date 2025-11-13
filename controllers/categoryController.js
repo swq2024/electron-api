@@ -170,7 +170,7 @@ const categoryController = {
                 return createFailResponse(res, 403, 'Cannot delete default category');
             }
 
-            // 检查是否有密码使用此分类
+            // 检查是否有密码使用此分类, 避免孤儿记录的存在
             const passwordsCount = await Password.count({
                 where: {
                     categoryId
@@ -225,27 +225,45 @@ const categoryController = {
                 return createSuccessResponse(res, 200, 'Category is already the default');
             }
 
-            // 查找当前默认分类并更新为非默认
-            await Category.update(
-                { isDefault: false }, // 更新字段为非默认
-                {
-                    where: {
-                        userId,
-                        isDefault: true // 查找当前默认分类
-                    },
+            // 查找并获取旧的默认分类
+            const oldDefaultCategory = await Category.findOne({
+                where: {
+                    userId,
+                    isDefault: true
                 },
-                { transaction }
-            )
+            }, { transaction });
 
-            // 将新分类设置为默认
+            if (oldDefaultCategory) {
+                // 如果存在旧的默认分类，则将其设置为非默认状态
+                await oldDefaultCategory.update({ isDefault: false }, { transaction });
+            }
+
+            let transferredCount = 0; // 用于记录转移的密码数量
+            if (oldDefaultCategory) {
+                const updateResult = await Password.update(
+                    { categoryId: newDefaultCategoryId }, // 更新字段为新分类ID(移动到新分类)
+                    {
+                        where: {
+                            categoryId: oldDefaultCategory.id, // 查找旧默认分类下的所有密码记录
+                            userId,
+                        },
+                    },
+                    { transaction }
+                );
+                transferredCount = updateResult[0]; // 获取受影响的行数，即转移的密码数量
+            }
+
+            // 将新分类设置为默认分类
             await categoryToSet.update({ isDefault: true }, { transaction });
 
             // 记录安全日志
             await logSecurityEvent(userId, 'default_category_changed', {
                 newDefaultCategoryId,
+                oldDefaultCategoryId: oldDefaultCategory ? oldDefaultCategory.id : null, // 旧的默认分类ID，如果没有则为null
+                transferredPasswordCount: transferredCount, // 转移的密码数量
                 ip: req.ip,
                 userAgent: req.get('User-Agent')
-            }, { transaction });
+            }, null, transaction);
 
             // 提交事务
             await transaction.commit();

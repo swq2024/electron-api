@@ -12,7 +12,8 @@ module.exports = (sequelize, DataTypes) => {
     static associate(models) {
       Password.belongsTo(models.User, { foreignKey: 'userId', as: 'user' });
       Password.belongsTo(models.Category, { foreignKey: 'categoryId', as: 'category' });
-      Password.hasMany(models.PasswordHistory, { foreignKey: 'passwordId', as: 'history' });
+      Password.hasMany(models.PasswordHistory, { foreignKey: 'passwordId', as: 'history'});
+      Password.hasMany(models.SecurityLog, { foreignKey: 'passwordId', as: 'securityLogs' })
     }
   }
   Password.init({

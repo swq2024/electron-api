@@ -11,6 +11,11 @@ module.exports = (sequelize, DataTypes) => {
      */
     static associate(models) {
       SecurityLog.belongsTo(models.User, { foreignKey: 'userId', as: 'user' });
+      SecurityLog.belongsTo(models.Password, {
+        foreignKey: 'passwordId',
+        as: 'password',
+        onDelete: 'CASCADE' // 当密码被删除时，与之相关的安全日志也应被级联删除
+      });
     }
   }
   SecurityLog.init({
@@ -23,6 +28,11 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.UUID,
       allowNull: false,
       field: 'user_id'
+    },
+    passwordId: {
+      type: DataTypes.UUID,
+      allowNull: true,
+      field: 'password_id'
     },
     action: {
       type: DataTypes.ENUM(

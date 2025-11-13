@@ -8,7 +8,7 @@ const router = express.Router();
 // 所有会话路由都需要认证
 router.use(authenticate);
 
-// 获取当前用户的所有活动会话
+// 获取当前用户的活动会话
 router.get('/', sessionController.getAll);
 
 // 远程注销指定会话
