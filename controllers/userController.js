@@ -3,8 +3,8 @@ const { validationResult } = require('express-validator');
 const { createSuccessResponse, createFailResponse } = require('../utils/response');
 const { logSecurityEvent } = require('../utils/logger');
 const bcrypt = require('bcrypt');
-const crypto = require('crypto');
 const { Op } = require('sequelize');
+const { generateTokenPair } = require('../services/authService');
 
 const userController = {
     // 获取用户信息
@@ -14,7 +14,7 @@ const userController = {
 
             const user = await User.findByPk(userId, {
                 attributes: {
-                    exclude: ['passwordHash', 'salt', 'twoFactorSecret']
+                    exclude: ['passwordHash', 'twoFactorSecret', 'tokenVersion', 'refreshTokenHash']
                 }
             });
 
@@ -111,27 +111,45 @@ const userController = {
             }
 
             // 验证当前密码是否正确
-            const isPasswordValid = await bcrypt.compare(currentPassword + user.salt, user.passwordHash);
+            const isPasswordValid = await bcrypt.compare(currentPassword, user.passwordHash);
             if (!isPasswordValid) {
                 return createFailResponse(res, 400, 'Current password is incorrect');
             }
 
-            const newSalt = crypto.randomBytes(16).toString('hex');
-            const newPasswordHash = await bcrypt.hash(newPassword + newSalt, 10);
+            // 验证新密码是否与当前密码相同
+            if (newPassword === currentPassword) {
+                return createFailResponse(res, 400, 'New password cannot be the same as the current password');
+            }
 
             // 更新用户密码
+            const newPasswordHash = await bcrypt.hash(newPassword, 10);
             await user.update({
                 passwordHash: newPasswordHash,
-                salt: newSalt
             });
 
+            // 更新用户的token版本号，以确保所有旧令牌失效: 增加版本号并清除旧的refreshTokenHash
+            const currentTokenVersion = user.tokenVersion; // 获取当前版本号
+            await user.increment('tokenVersion');
+            user.refreshTokenHash = null;
+
             // 记录安全日志
-            await logSecurityEvent(req, 'password_updated', {
+            await logSecurityEvent(userId, 'password_updated', {
+                reason: `User changed password. Token version updated from ${currentTokenVersion} to ${user.tokenVersion}.`,
                 ip: req.ip,
                 userAgent: req.get('User-Agent')
             });
 
-            return createSuccessResponse(res, 200, 'Password changed successfully');
+            // 生成新版本的令牌对并更新refreshTokenHash
+            const { accessToken, refreshToken } = generateTokenPair(user);
+            const newRefreshTokenHash = await bcrypt.hash(refreshToken, 10);
+            await user.update({
+                refreshTokenHash: newRefreshTokenHash,
+            });
+
+            return createSuccessResponse(res, 200, 'Password changed successfully! Your session has been secured with a new tokens.', {
+                accessToken,
+                refreshToken
+            });
         } catch (error) {
             console.error('Change password error:', error);
             return createFailResponse(res, 500, 'Internal server error');
@@ -153,6 +171,11 @@ const userController = {
             if (enable && !secret) {
                 return createFailResponse(res, 400, 'Secret is required to enable two-factor authentication');
             }
+
+            // 验证密钥的有效性（此处仅为示例，实际应用中应进行更复杂的校验）
+            // if (enable && !validateSecret(secret)) {
+            //     return createFailResponse(res, 400, 'Invalid secret for two-factor authentication');
+            // }
 
             // 更新双因素认证状态和密钥
             await user.update({

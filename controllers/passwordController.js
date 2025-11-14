@@ -16,10 +16,7 @@ const passwordController = {
             }
 
             const { title, username, password, url, notes, categoryId, customFields } = req.body;
-            const {
-                id: userId,
-                salt: userSalt
-            } = req.user;
+            const { id: userId } = req.user;
 
             // 如果没有categoryId，则使用用户注册时创建的默认分类
             let findCategoryId = categoryId;
@@ -37,8 +34,10 @@ const passwordController = {
             }
 
             // 加密密码
-            const encryptedPassword = encrypt(password, userSalt);
+            const encryptedPassword = encrypt(password, process.env.MASTER_PASSWORD);
 
+            console.log('abc', encryptedPassword);
+            
 
             // 计算密码强度
             const passwordStrength = calculatePasswordStrength(password);
@@ -147,10 +146,7 @@ const passwordController = {
 
             const { id } = req.params;
 
-            const {
-                id: userId,
-                salt: userSalt
-            } = req.user;
+            const { id: userId } = req.user;
 
             const password = await Password.findOne({
                 where: {
@@ -174,7 +170,7 @@ const passwordController = {
             await password.update({ lastUsed: new Date() });
 
             // 解密密码
-            const decryptedPassword = decrypt(password.encryptedPassword, userSalt);
+            const decryptedPassword = decrypt(password.encryptedPassword, process.env.MASTER_PASSWORD);
 
             // 记录安全日志
             await logSecurityEvent(userId, 'password_accessed', {
@@ -215,10 +211,7 @@ const passwordController = {
             }
 
             const { id } = req.params;
-            const {
-                id: userId,
-                salt: userSalt
-            } = req.user
+            const { id: userId } = req.user
             const { title, username, password, url, notes, categoryId, customFields } = req.body;
 
             // 查找现有密码记录
@@ -234,7 +227,7 @@ const passwordController = {
             }
 
             // 检查密码是否发生变化，如果变化保存密码历史记录
-            if (password && password !== decrypt(existingPassword.encryptedPassword, userSalt)) {
+            if (password && password !== decrypt(existingPassword.encryptedPassword, process.env.MASTER_PASSWORD)) {
                 // 保存密码历史记录
                 await PasswordHistory.create({
                     passwordId: id, // 原始密码ID
@@ -254,7 +247,7 @@ const passwordController = {
 
             // 如果提供了新密码，则加密并更新
             if (password) {
-                updateData.encryptedPassword = encrypt(password, userSalt); // 加密新密码
+                updateData.encryptedPassword = encrypt(password, process.env.MASTER_PASSWORD); // 加密新密码
                 updateData.passwordStrength = calculatePasswordStrength(password); // 计算密码强度
             }
 
@@ -350,10 +343,7 @@ const passwordController = {
     async getHistory(req, res) {
         try {
             const { id } = req.params;
-            const {
-                id: userId,
-                salt: userSalt
-            } = req.user;
+            const { id: userId } = req.user;
 
             // 验证密码是否属于当前用户
             const password = await Password.findOne({
@@ -377,7 +367,7 @@ const passwordController = {
             const decryptedPasswords = history.map(h => ({
                 id: h.id,
                 changedAt: h.changed_at,
-                decryptedPassword: decrypt(h.encryptedPassword, userSalt)
+                decryptedPassword: decrypt(h.encryptedPassword, process.env.MASTER_PASSWORD)
             }));
 
             return createSuccessResponse(res, 200, 'Password history retrieved successfully', {

@@ -1,22 +1,20 @@
 const jwt = require('jsonwebtoken');
 const { v4: uuidv4 } = require('uuid');
 
-const generateToken = (userId, role) => {
+// 生成token对: 用户登录成功后，生成一对token对（accessToken和refreshToken）并返回给客户端。
+const generateTokenPair = (user) => {
     const payload = {
-        userId,
-        role,
-        /**
-         * 添加唯一标识符，用于黑名单管理 JTI（JWT ID）是一个可选的声明，用于标识每个令牌的唯一性。
-         * 在黑名单管理中，我们可以使用这个ID来识别并阻止特定的令牌被再次接受验证。
-         */
-        jti: uuidv4()
+        userId: user.id,
+        token_version: user.tokenVersion
     }
-
-    return jwt.sign(
+    const accessToken = jwt.sign(
         payload,
         process.env.JWT_SECRET,
-        { expiresIn: '7d', }
-    );
+        { expiresIn: '15m', }
+    )
+    const refreshToken = uuidv4();
+
+return { accessToken, refreshToken };
 };
 
 const verifyToken = (token) => {
@@ -29,6 +27,6 @@ const verifyToken = (token) => {
 };
 
 module.exports = {
-    generateToken,
     verifyToken,
+    generateTokenPair,
 };

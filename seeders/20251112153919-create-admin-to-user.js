@@ -1,7 +1,6 @@
 'use strict';
 
 const bcrypt = require('bcrypt');
-const crypto = require('crypto');
 const { v4: uuidv4 } = require('uuid');
 require('@dotenvx/dotenvx').config();
 
@@ -12,8 +11,7 @@ module.exports = {
     const adminEmail = process.env.ADMIN_EMAIL || 'admin@example.com';
     const adminPassword = process.env.ADMIN_PASSWORD || 'admin123'; // 仅用于开发，生产环境必须设置环境变量
 
-    const salt = crypto.randomBytes(16).toString('hex');
-    const passwordHash = await bcrypt.hash(adminPassword + salt, 10);
+    const passwordHash = await bcrypt.hash(adminPassword, 10);
 
     // rawSelect 方法执行一个原始的 SELECT SQL查询
     const existingAdmin = await queryInterface.rawSelect(
@@ -41,7 +39,8 @@ module.exports = {
         username: 'admin',
         email: adminEmail,
         password_hash: passwordHash,
-        salt,
+        token_version: 1,
+        refresh_token_hash: null,
         role: 'admin',
         createdAt: new Date(),
         updatedAt: new Date()

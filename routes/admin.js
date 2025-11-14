@@ -73,7 +73,7 @@ router.get('/security-logs', [
     query('action')
         .optional()
         .isIn([
-            'login', 'logout', 'login_failed', 'password_changed',
+            'login', 'logout', 'login_failed',
             'password_accessed', 'password_created', 'password_updated',
             'password_deleted', 'account_created', 'account_locked',
             'account_unlocked', 'two_factor_enabled', 'profile_updated',

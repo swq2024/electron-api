@@ -37,7 +37,7 @@ const adminController = {
             const { count, rows: users } = await User.findAndCountAll({
                 where: whereClause,
                 attributes: {
-                    exclude: ['passwordHash', 'salt', 'twoFactorSecret']
+                    exclude: ['password', 'twoFactorSecret', 'tokenVersion', 'refreshTokenHash']
                 },
                 order: [['createdAt', 'DESC']],
                 offset,

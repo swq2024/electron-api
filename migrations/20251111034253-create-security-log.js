@@ -16,7 +16,7 @@ module.exports = {
       },
       action: {
         type: Sequelize.ENUM(
-          'login', 'logout', 'login_failed', 'password_changed',
+          'login', 'logout', 'login_failed',
           'password_created', 'password_updated', 'password_deleted',
           'account_created', 'account_updated', 'account_deleted',
           'account_locked', 'account_unlocked', 'two_factor_enabled',

@@ -8,10 +8,10 @@ const router = express.Router();
 // 所有用户路由都需要认证
 router.use(authenticate);
 
-// 获取用户信息
+// 获取个人信息
 router.get('/profile', userController.getProfile);
 
-// 更新用户信息
+// 更新个人信息
 router.put('/profile', [
   body('username')
     .optional()

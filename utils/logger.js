@@ -8,7 +8,7 @@ async function logSecurityEvent(userId, action, details = {}, passwordId = null,
             action,
             details,
             ipAddress: details.ip || null,
-            userAgent: details.userAgent || null,
+            userAgent: details.userAgent || null
         }, { transaction })
     } catch (error) {
         console.error('Error logging security event:', error);

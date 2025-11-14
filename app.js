@@ -1,3 +1,6 @@
+const loadEnv = require('./utils/loadEnv');
+loadEnv(__dirname);
+
 const express = require('express');
 const helmet = require('helmet');
 const compression = require('compression');
@@ -6,14 +9,14 @@ const cookieParser = require('cookie-parser');
 const logger = require('morgan');
 const routes = require('./routes/index');
 const { errorHandler } = require('./middlewares/errorHandler');
-// const crypto = require('crypto');
-// // 生成随机字符串
-// console.log(crypto.randomBytes(32).toString('hex'));
-
-const loadEnv = require('./utils/loadEnv');
-loadEnv();
+const cors = require('cors');
+// const { generateSuperStrongPassword } = require('./services/encryptionService')
+// console.log(generateSuperStrongPassword(32));
 
 const app = express();
+
+// 解决跨域问题
+app.use(cors());
 
 // console.log(process.env.ADMIN_EMAIL);
 // console.log(process.env.ADMIN_PASSWORD);

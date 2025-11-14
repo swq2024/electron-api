@@ -2,26 +2,26 @@ const { join } = require('path');
 const fs = require('fs');
 const dotenvx = require('@dotenvx/dotenvx')
 
-function loadEnv() {
+function loadEnv(base_path) {
     const env = process.env.NODE_ENV || 'development';
-    const basePath = process.cwd();
 
     // 变量相同的情况下, 加载优先级: .env.local > .env.development > .env
     const envFiles = [
-        join(basePath, '.env'),
-        join(basePath, `.env.${env}`),
-        join(basePath, '.env.local')
+        join(base_path, '.env'),
+        join(base_path, `.env.${env}`),
+        join(base_path, '.env.local')
     ]
 
     // 反向遍历, 靠后的文件优先级更高
     for (let i = envFiles.length - 1; i >= 0; i--) {
         const file = envFiles[i];
         if (fs.existsSync(file)) {
+            console.log(`Loading env from: ${file}`); // 添加日志，方便调试
             // 加载环境变量文件, 并解析私钥文件
             dotenvx.config({
                 path: file,
                 // 加载私钥文件
-                envKeysFile: join(basePath, '.env.keys'),
+                envKeysFile: join(base_path, '.env.keys'),
                 logLevel: process.env.LOG_LEVEL
             });
         }

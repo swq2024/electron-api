@@ -40,7 +40,11 @@ router.post('/login', [
 router.post('/logout', authenticate, authController.logout);
 
 // 刷新令牌 /auth/refresh
-router.post('/refresh', authenticate, authController.refreshToken);
+router.post('/refresh', [
+    body('refreshToken')
+        .notEmpty()
+        .withMessage('Refresh token is required')
+], authController.refreshToken);
 
 // 用户密码重置请求
 // router.post('/request-password-reset', [

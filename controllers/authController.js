@@ -1,10 +1,8 @@
 const bcrypt = require('bcrypt');
-const crypto = require('crypto');
 const { User, Category, Session, sequelize } = require('../models');
 const { validationResult } = require('express-validator');
 const { parseUserAgent } = require('../utils/deviceParser');
-const { generateToken, verifyToken } = require('../services/authService');
-const { addToBlacklist, isBlacklisted } = require('../services/blacklistService');
+const { generateTokenPair } = require('../services/authService');
 const { createSuccessResponse, createFailResponse } = require('../utils/response');
 const { logSecurityEvent } = require('../utils/logger');
 const { Op } = require('sequelize');
@@ -38,16 +36,13 @@ const authController = {
                 return createFailResponse(res, 409, 'Username or email already exists');
             }
 
-            // 生成盐值并哈希密码
-            const salt = crypto.randomBytes(16).toString('hex');
-            const passwordHash = await bcrypt.hash(password + salt, 10);
-
             // 创建新用户
             const newUser = await User.create({
                 username,
                 email,
-                passwordHash,
-                salt,
+                passwordHash: password,
+                tokenVersion: 1,
+                refreshTokenHash: null,
                 masterPasswordHint
             }, { transaction });
 
@@ -68,18 +63,7 @@ const authController = {
                 userAgent: req.get('User-Agent')
             });
 
-            // 生成JWT令牌
-            const token = generateToken(newUser.id, newUser.role); // 默认角色为'user'
-
-            return createSuccessResponse(res, 201, 'User registered successfully', {
-                user: {
-                    id: newUser.id,
-                    username: newUser.username,
-                    email: newUser.email,
-                    role: newUser.role
-                },
-                token
-            });
+            return createSuccessResponse(res, 201, 'User registered successfully. Please log in.');
         } catch (error) {
             await transaction.rollback();
             console.error('Error during registration:', error);
@@ -89,6 +73,8 @@ const authController = {
 
     // 用户登录
     async login(req, res) {
+        // 开启事务支持
+        const transaction = await sequelize.transaction();
         try {
             const errors = validationResult(req);
             if (!errors.isEmpty()) {
@@ -97,22 +83,16 @@ const authController = {
 
             const { username, password, twoFactorCode } = req.body;
 
-            // 查找用户
-            const user = await User.findOne({
+            // 查找用户, 限定scope为'withHashes', 这样可以直接访问passwordHash等hash字段
+            const user = await User.scope('withHashes').findOne({
                 where: {
                     // 支持用户名或邮箱登录
                     [Op.or]: [{ username }, { email: username }]
-                }
-            });
+                },
+            }, { transaction });
+
 
             if (!user) {
-                // 即使没有找到用户，也可以记录一个通用的失败日志，用于监控异常的登录尝试
-                await logSecurityEvent(null, 'login_failed', {
-                    attemptedUsername: username,
-                    ip: req.ip,
-                    userAgent: req.get('User-Agent'),
-                    reason: 'user_not_found'
-                })
                 return createFailResponse(res, 401, 'Invalid username or email');
             }
 
@@ -121,8 +101,8 @@ const authController = {
                 return createFailResponse(res, 423, 'Account is temporarily locked');
             }
 
-            // 验证密码
-            const isPasswordValid = await bcrypt.compare(password + user.salt, user.passwordHash);
+            // 验证密码是否正确
+            const isPasswordValid = bcrypt.compareSync(password, user.passwordHash);
 
             if (!isPasswordValid) {
                 // 增加登录失败次数
@@ -138,7 +118,7 @@ const authController = {
                     await logSecurityEvent(user.id, 'account_locked', {
                         ip: req.ip,
                         userAgent: req.get('User-Agent')
-                    });
+                    }, null, transaction);
                     return createFailResponse(res, 423, 'Account locked due to multiple failed login attempts');
                 }
 
@@ -147,7 +127,7 @@ const authController = {
                     ip: req.ip,
                     userAgent: req.get('User-Agent'),
                     reason: 'invalid_password'
-                });
+                }, null, transaction);
 
                 return createFailResponse(res, 401, 'Invalid username or password');
             }
@@ -170,39 +150,41 @@ const authController = {
                 failedLoginAttempts: 0,
                 lockedUntil: null, // 解锁账户
                 lastLogin: new Date() // 记录最后登录时间
-            });
+            }, { transaction });
 
-            // 生成JWT令牌并返回用户信息
-            const token = generateToken(user.id, user.role);
-            const decoded = jwt.decode(token); // 解码JWT以获取用户信息, 包含jti和exp
+            // 生成JWT令牌对，包含访问令牌和刷新令牌
+            const { accessToken, refreshToken } = generateTokenPair(user);
+
+            // 将刷新令牌哈希存储在用户记录中，以便后续可以验证刷新令牌
+            user.refreshTokenHash = await bcrypt.hash(refreshToken, 10);
+            await user.save({ transaction });
+
+            const decoded = jwt.decode(accessToken); // 解码JWT以获取过期时间等信息
 
             // 记录会话信息
             const deviceInfo = parseUserAgent(req.get('User-Agent')); // 解析用户代理字符串以获取设备信息
             await Session.create({
                 userId: user.id,
-                jti: decoded.jti,
                 deviceInfo,
                 ipAddress: req.ip,
                 userAgent: req.get('User-Agent'),
                 expiresAt: new Date(decoded.exp * 1000) // 将JWT的过期时间转换为毫秒并设置为会话记录的过期时间
-            })
+            }, { transaction })
 
 
             // 记录登录成功的安全日志
             await logSecurityEvent(user.id, 'login', {
                 ip: req.ip,
                 userAgent: req.get('User-Agent')
-            });
+            }, null, transaction);
+
+            // 提交事务
+            await transaction.commit();
 
             return createSuccessResponse(res, 200, 'Login successful', {
-                user: {
-                    id: user.id,
-                    username: user.username,
-                    email: user.email,
-                    role: user.role,
-                    twoFactorEnabled: user.twoFactorEnabled // 返回双因素认证状态信息，以便前端可以据此显示或隐藏相关UI元素
-                },
-                token // 前端通过npm install jwt-decode可以解析出jti和exp等信息，供前端显示会话活动信息，例如会话过期时间, 是否是当前设备。
+                user,
+                accessToken,
+                refreshToken
             });
         } catch (error) {
             console.error('Error during login:', error);
@@ -216,36 +198,14 @@ const authController = {
             const userId = req.user.id; // 从请求对象中获取用户ID
 
             // 这里应该使JWT令牌失效，但由于JWT是无状态的，我们需要使用Redis的黑名单机制来阻止旧的令牌被再次使用。
-            const token = req.token; // 从请求对象中获取JWT令牌
-            const tokenJti = req.tokenJti; // 从请求对象中获取令牌的jti值，用于在黑名单中查找和删除该令牌
+            // const token = req.token; // 从请求对象中获取JWT令牌
 
-            delete req.user; // 删除请求对象中的JWT令牌
-            delete req.tokenJti; // 删除请求对象中的令牌jti值
+            // delete req.user; // 清除请求对象中的用户信息
 
-            const currentSession = await Session.findOne({
-                where: {
-                    userId,
-                    jti: tokenJti
-                }
-            });
-
-            if (currentSession) {
-                await currentSession.update({ isActive: false });
-            }
-
-            const decoded = verifyToken(token);
-            if (!decoded) {
-                return createSuccessResponse(res, 200, 'Logout successful (token was already invalid).');
-            }
-
-            // 计算令牌剩余的有效时间（秒）
-            const now = Math.floor(Date.now() / 1000); // 当前时间戳（秒）
-            const expiresIn = decoded.exp - now;
-
-            if (expiresIn > 0) {
-                // 将令牌添加到黑名单，并设置过期时间等于剩余的有效时间，这样可以确保在令牌完全失效之前阻止其使用。
-                await addToBlacklist(token, expiresIn);
-            }
+            // const decoded = verifyToken(token);
+            // if (!decoded) {
+            //     return createSuccessResponse(res, 200, 'Logout successful (token was already invalid).');
+            // }
 
             // 记录登出成功的安全日志
             await logSecurityEvent(userId, 'logout', {
@@ -263,39 +223,37 @@ const authController = {
     // 刷新JWT令牌
     async refreshToken(req, res) {
         try {
-            const { id: userId } = req.user;
-            const authHeader = req.headers.authorization;
-            if (!authHeader || !authHeader.startsWith('Bearer ')) {
-                return createFailResponse(res, 401, 'Access token required for refresh');
+            const errors = validationResult(req);
+            if (!errors.isEmpty()) {
+                return createFailResponse(res, 400, 'Validation failed', errors.array());
             }
 
-            const token = authHeader.split(' ')[1]; // 从授权令牌中提取实际的JWT字符串（假设格式为"Bearer <token>"）
-            const decoded = verifyToken(token); // 验证JWT令牌的有效性并获取其内容
-            if (!decoded) {
-                return createFailResponse(res, 401, 'Invalid or expired token for refresh');
+            // const { id: userId } = req.user;
+            const { refreshToken } = req.body;
+
+            // const user = await User.findByPk(userId);
+            // if (!user || !user.isActive) {
+            //     return createFailResponse(res, 401, 'User not found or inactive');
+            // }
+
+            // 使用模型中自定义方法查找用户
+            const user = await User.findByRefreshToken(refreshToken);
+            if (!user) {
+                return createFailResponse(res, 401, 'Invalid or expired refresh token');
             }
 
-            const isInBlacklist = await isBlacklisted(token);
-            if (isInBlacklist) {
-                return createFailResponse(res, 401, 'Token has been revoked, please login again');
-            }
+            // 生成新的令牌对
+            const { accessToken, refreshToken: newRefreshToken } = generateTokenPair(user);
 
-            const user = await User.findByPk(userId);
-            if (!user || !user.isActive) {
-                return createFailResponse(res, 401, 'User not found or inactive');
-            }
-
-            const now = Math.floor(Date.now() / 1000);
-            const expiresIn = decoded.exp - now;
-            if (expiresIn > 0) {
-                await addToBlacklist(token, expiresIn);
-            }
-
-            // 生成一个新的JWT令牌并返回给客户端。
-            const newToken = generateToken(userId, user.role);
+            // 更新用户的刷新令牌哈希
+            const newRefreshTokenHash = await bcrypt.hash(newRefreshToken, 10);
+            await user.update({
+                refreshTokenHash: newRefreshTokenHash
+            });
 
             return createSuccessResponse(res, 200, 'Token refreshed successfully', {
-                token: newToken
+                accessToken,
+                refreshToken: newRefreshToken
             });
         } catch (error) {
             console.error('Error during refreshing token:', error);

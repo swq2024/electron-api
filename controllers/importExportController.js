@@ -10,10 +10,7 @@ const importExportController = {
     // 导出密码
     async export(req, res) {
         try {
-            const {
-                id: userId,
-                salt: userSalt
-            } = req.user;
+            const { id: userId } = req.user;
             const { format = 'json', categoryId } = req.query;
 
             // 构建查询条件
@@ -41,7 +38,7 @@ const importExportController = {
             // 解密密码
             const decryptedPasswords = passwords.map(password => {
                 const passwordData = password.toJSON();
-                passwordData.password = decrypt(passwordData.encryptedPassword, userSalt);
+                passwordData.password = decrypt(passwordData.encryptedPassword, process.env.MASTER_PASSWORD);
                 delete passwordData.encryptedPassword;
                 delete passwordData.userId;
                 return passwordData;
@@ -77,10 +74,7 @@ const importExportController = {
     // 导入密码
     async import(req, res) {
         try {
-            const {
-                id: userId,
-                salt: userSalt
-            } = req.user;
+            const { id: userId } = req.user;
             // 这里的passwords 应该是一个数组，每个元素都是一个对象，包含密码的详细信息。例如：
             // [
             //     { title: 'Example', password: 'examplepassword', 'category': 'Example Category' },
@@ -145,7 +139,7 @@ const importExportController = {
                         }
 
                         // 加密密码
-                        const encryptedPassword = encrypt(passwordData.password, userSalt);
+                        const encryptedPassword = encrypt(passwordData.password, process.env.MASTER_PASSWORD);
 
                         // 计算密码强度
                         const passwordStrength = calculatePasswordStrength(passwordData.password);
@@ -225,7 +219,7 @@ const importExportController = {
                                         }
 
                                         // 加密密码
-                                        const encryptedPassword = encrypt(passwordData.password, userSalt);
+                                        const encryptedPassword = encrypt(passwordData.password, process.env.MASTER_PASSWORD);
 
                                         // 计算密码强度
                                         const passwordStrength = calculatePasswordStrength(passwordData.password);

@@ -1,5 +1,4 @@
 const { Session } = require('../models');
-const { addToBlacklist } = require('../services/blacklistService');
 const { createSuccessResponse, createFailResponse } = require('../utils/response');
 const { Op } = require('sequelize');
 

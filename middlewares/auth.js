@@ -1,5 +1,4 @@
 const { verifyToken } = require('../services/authService');
-const { isBlacklisted } = require('../services/blacklistService');
 const { User } = require('../models');
 const { createFailResponse } = require('../utils/response');
 
@@ -15,9 +14,7 @@ const authenticate = async (req, res, next) => {
         }
 
         const token = authHeader.substring(7); // 从Bearer Token中提取令牌值
-
-        const decoded = verifyToken(token); // 验证令牌的有效性
-
+        
         /**
          * 例如：decoded = 
          * {
@@ -29,16 +26,7 @@ const authenticate = async (req, res, next) => {
                 exp: 1765457370 
             }
          */
-
-        if (!decoded) {
-            return createFailResponse(res, 401, 'Invalid or expired token');
-        }
-
-        // 检查令牌是否已被列入黑名单（例如，用户已登出或注销session）
-        const isInBlacklist = await isBlacklisted(decoded.jti);
-        if (isInBlacklist) {
-            return createFailResponse(res, 401, 'Token has been revoked');
-        }
+        const decoded = verifyToken(token); // 验证令牌的有效性
 
         const user = await User.findByPk(decoded.userId); // 根据令牌中的用户ID查找用户
 
@@ -46,14 +34,17 @@ const authenticate = async (req, res, next) => {
             return createFailResponse(res, 401, 'User not found or inactive');
         }
 
+        // 检查token版本是否与数据库中一致
+        if (user.tokenVersion !== decoded.token_version) {
+            return createFailResponse(res, 401, 'Token is invalid or expired, please log in again');
+        }
+
         req.user = user; // 将用户信息附加到请求对象上 方便在后续中间件或路由处理函数中使用
-        req.token = token; // 登出时/注销会话时需要用到token
-        req.tokenJti = decoded.jti; // 注销会话时需要用到token的JTI（JWT ID）
 
         next();
     } catch (error) {
         console.error('Authentication error:', error);
-        return createErrorResponse(res, 500, 'Internal server error');
+        return createFailResponse(res, 401, 'Internal server error');
     }
 }
 

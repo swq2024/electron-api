@@ -1,7 +1,11 @@
 'use strict';
 const {
-  Model
+  Model,
+  Op
 } = require('sequelize');
+const bcrypt = require('bcrypt');
+const { BadRequest } = require('http-errors');
+
 module.exports = (sequelize, DataTypes) => {
   class User extends Model {
     /**
@@ -14,6 +18,35 @@ module.exports = (sequelize, DataTypes) => {
       User.hasMany(models.Category, { foreignKey: 'userId', as: 'categories' });
       User.hasMany(models.Session, { foreignKey: 'userId', as: 'sessions' });
       User.hasMany(models.SecurityLog, { foreignKey: 'userId', as: 'securityLogs' });
+    }
+
+    async compareRefreshToken(refreshToken) {
+      if (!this.refreshTokenHash) return false;
+      return await bcrypt.compare(refreshToken, this.refreshTokenHash);
+    }
+
+    // 请求刷新令牌接口需要通过 refreshToken 查找用户
+    static async findByRefreshToken(refreshToken) {
+      if (!refreshToken) return null;
+      // 1. 查找所有拥有 refreshTokenHash 的用户
+      // 在大型系统中，这可能会是一个性能瓶颈。
+      // 对于中小型应用，这是可以接受的。
+      // 未来优化方向：将 userId 嵌入到 refreshToken 中，从而实现单用户查询。
+      const usersWithHashes = await this.scope('withHashes').findAll({
+        where: {
+          refreshTokenHash: {
+            [Op.not]: null
+          }
+        }
+      })
+
+      // 2. 检查每个用户的 refreshTokenHash 是否匹配
+      for(const user of usersWithHashes){
+        if (await user.compareRefreshToken(refreshToken)) {
+          return user; // 找到匹配的用户，返回
+        }
+      }
+      return null; // 没有找到匹配的用户，返回 null
     }
   }
   User.init({
@@ -41,11 +74,24 @@ module.exports = (sequelize, DataTypes) => {
     passwordHash: {
       type: DataTypes.STRING,
       allowNull: false,
-      field: 'password_hash'
+      field: 'password_hash',
+      set(value) {
+        if (!value) throw new BadRequest('Password is required');
+        if (value.length < 8 || value.length > 45)
+          throw new BadRequest('Password must be between 6 and 45 characters');
+        this.setDataValue('passwordHash', bcrypt.hashSync(value, 10));
+      }
     },
-    salt: {
+    tokenVersion: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      defaultValue: 1,
+      field: 'token_version'
+    },
+    refreshTokenHash: {
       type: DataTypes.STRING,
-      allowNull: false
+      allowNull: true,
+      field: 'refresh_token_hash'
     },
     role: {
       type: DataTypes.ENUM('admin', 'user', 'vip'),
@@ -91,8 +137,22 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.DATE
     }
   }, {
+    hooks: {},
     sequelize,
     modelName: 'User',
+    defaultScope: {
+      attributes: {
+        exclude: ['passwordHash', 'refreshTokenHash'] // 默认不查询密码哈希和刷新令牌哈希
+      }
+    },
+    scopes: {
+      withHashes: {
+        attributes: {
+          include: ['passwordHash', 'refreshTokenHash'] // 用于需要密码哈希和刷新令牌哈希的查询，例如登录验证/刷新令牌验证
+        }
+      }
+    }
   });
   return User;
 };
+

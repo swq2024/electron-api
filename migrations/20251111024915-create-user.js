@@ -25,14 +25,10 @@ module.exports = {
           isEmail: true
         }
       },
-      passwordHash: { // 密码哈希值 (存储用户密码的哈希值)
+      passwordHashe: { // 密码哈希 (用于存储加密后的用户密码)
         type: Sequelize.STRING,
         allowNull: false,
         field: 'password_hash'
-      },
-      salt: { // 盐值 (用于密码加密的盐值)
-        type: Sequelize.STRING,
-        allowNull: false
       },
       role: {
         type: Sequelize.ENUM('user', 'admin', 'VIP'),
