@@ -17,10 +17,13 @@ module.exports = {
       action: {
         type: Sequelize.ENUM(
           'login', 'logout', 'login_failed',
-          'password_created', 'password_updated', 'password_deleted',
-          'account_created', 'account_updated', 'account_deleted',
-          'account_locked', 'account_unlocked', 'two_factor_enabled',
-          'two_factor_disabled', 'export_data', 'import_data'),
+          'password_accessed', 'password_created', 'password_updated',
+          'password_deleted', 'account_created', 'account_locked',
+          'account_unlocked', 'two_factor_enabled', 'profile_updated',
+          'two_factor_disabled', 'export_data', 'import_data',
+          'user_role_updated', 'user_enabled', 'user_disabled',
+          'default_category_changed', 'token_refreshed'
+        ),
         allowNull: false,
       },
       details: {

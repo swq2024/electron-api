@@ -2,9 +2,10 @@ const bcrypt = require('bcrypt');
 const { User, Category, Session, sequelize } = require('../models');
 const { validationResult } = require('express-validator');
 const { parseUserAgent } = require('../utils/deviceParser');
-const { generateTokenPair } = require('../services/authService');
+const { generateTokenPair, verifyToken, decodeToken } = require('../services/authService');
 const { createSuccessResponse, createFailResponse } = require('../utils/response');
 const { logSecurityEvent } = require('../utils/logger');
+const { addToBlacklist, isBlacklisted } = require('../services/blacklistService');
 const { Op } = require('sequelize');
 const jwt = require('jsonwebtoken');
 
@@ -55,13 +56,13 @@ const authController = {
                 isDefault: true // 设置为默认分类 默认 false
             }, { transaction })
 
-            await transaction.commit(); // 提交事务
-
             // 记录安全日志
             await logSecurityEvent(newUser.id, 'account_created', {
                 ip: req.ip,
                 userAgent: req.get('User-Agent')
-            });
+            }, null, transaction);
+
+            await transaction.commit(); // 提交事务
 
             return createSuccessResponse(res, 201, 'User registered successfully. Please log in.');
         } catch (error) {
@@ -110,24 +111,21 @@ const authController = {
 
                 // 如果登录失败次数超过阈值，锁定账户
                 if (user.failedLoginAttempts >= 5) { // 阈值为5次
-                    const lockTime = new Date(); // 锁定时间设置为当前时间
-                    lockTime.setMinutes(lockTime.getMinutes() + 1); // 加锁时间设置为当前时间的一分钟后
-                    await user.update({ lockedUntil: lockTime }); // 更新锁定时间
+                    const lockTime = new Date();
+                    // 锁定1分钟
+                    lockTime.setMinutes(lockTime.getMinutes() + 1);
+                    // 更新锁定时间
+                    await user.update({
+                        lockedUntil: lockTime
+                    });
 
                     // 记录登录失败的安全日志
                     await logSecurityEvent(user.id, 'account_locked', {
                         ip: req.ip,
                         userAgent: req.get('User-Agent')
-                    }, null, transaction);
+                    });
                     return createFailResponse(res, 423, 'Account locked due to multiple failed login attempts');
                 }
-
-                // 记录登录失败的安全日志
-                await logSecurityEvent(user.id, 'login_failed', {
-                    ip: req.ip,
-                    userAgent: req.get('User-Agent'),
-                    reason: 'invalid_password'
-                }, null, transaction);
 
                 return createFailResponse(res, 401, 'Invalid username or password');
             }
@@ -156,19 +154,32 @@ const authController = {
             const { accessToken, refreshToken } = generateTokenPair(user);
 
             // 将刷新令牌哈希存储在用户记录中，以便后续可以验证刷新令牌
-            user.refreshTokenHash = await bcrypt.hash(refreshToken, 10);
-            await user.save({ transaction });
+            const newRefreshTokenHash = await bcrypt.hash(refreshToken, 10);
+            await user.update({
+                refreshTokenHash: newRefreshTokenHash
+            }, { transaction });
 
-            const decoded = jwt.decode(accessToken); // 解码JWT以获取过期时间等信息
+            // 解码JWT以获取过期时间等信息
+            const decoded = jwt.decode(accessToken);
+
+            const atExpiresAt = new Date(decoded.exp * 1000);
+
+            // 手动为刷新令牌设置过期时间，设置为7天
+            const rtExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
 
             // 记录会话信息
             const deviceInfo = parseUserAgent(req.get('User-Agent')); // 解析用户代理字符串以获取设备信息
             await Session.create({
                 userId: user.id,
+                jti: JSON.stringify({
+                    at: decoded.jti, // AT的jti
+                    rt: refreshToken // RT本身就是一个UUID, 它的jti就是它自己
+                }),
                 deviceInfo,
                 ipAddress: req.ip,
                 userAgent: req.get('User-Agent'),
-                expiresAt: new Date(decoded.exp * 1000) // 将JWT的过期时间转换为毫秒并设置为会话记录的过期时间
+                expiresAt: atExpiresAt, // AT过期时间
+                rtExpiresAt: rtExpiresAt // RT过期时间
             }, { transaction })
 
 
@@ -195,17 +206,62 @@ const authController = {
     // 用户登出
     async logout(req, res) {
         try {
-            const userId = req.user.id; // 从请求对象中获取用户ID
+            const userId = req.user.id;
+            const currentAT = req.token; // AT
+            const currentATJti = req.tokenJti; // AT的jti
 
-            // 这里应该使JWT令牌失效，但由于JWT是无状态的，我们需要使用Redis的黑名单机制来阻止旧的令牌被再次使用。
-            // const token = req.token; // 从请求对象中获取JWT令牌
+            if (!token) {
+                return createFailResponse(res, 401, 'No token provided for logout');
+            }
 
-            // delete req.user; // 清除请求对象中的用户信息
+            const decode = verifyToken(currentAT);
+            if (!decode) {
+                return createFailResponse(res, 200, 'Logout successful(token was already invalid)');
+            }
 
-            // const decoded = verifyToken(token);
-            // if (!decoded) {
-            //     return createSuccessResponse(res, 200, 'Logout successful (token was already invalid).');
-            // }
+            const currentSession = await Session.findOne({
+                where: {
+                    userId,
+                    jti: {
+                        [Op.contains]: currentATJti
+                    }
+                }
+            })
+            if (!currentSession) {
+                return createFailResponse(res, 200, 'Logout successful');
+            }
+
+            // 从会话记录中解析出双jti
+            let jtiObj;
+            try {
+                jtiObj = JSON.parse(currentSession.jti);
+            } catch (e) {
+                console.error('Fail to parse jti from session', e);
+                // 解析失败, 但仍继续处理AT
+                jtiObj = { at: currentATJti, rt: null };
+            }
+
+            // 计算AT的剩余有效时间
+            const now = Math.floor(Date.now() / 1000);
+            const atExpiresIn = decode.exp - now;
+
+            // 计算RT的剩余有效时间
+            const rtExpiresIn = Math.floor((new Date(currentSession.rtExpiresAt).getTime() / 1000)) - now;
+
+            // 将AT的jti加入黑名单
+            if (atExpiresIn > 0) {
+                await addToBlacklist(jtiObj.at, atExpiresIn);
+                console.log(`Access token ${jtiObj.at} added to blacklist with TTL ${atExpiresIn}s.`);
+            }
+            // 将RT的jti加入黑名单
+            if (jtiObj.rt && rtExpiresIn > 0) {
+                await addToBlacklist(jtiObj.rt, rtExpiresIn);
+                console.log(`Refresh token ${jtiObj.rt} added to blacklist with TTL ${rtExpiresIn}s.`);
+            }
+            // 更新会话状态为非活动状态
+            await currentSession.update({
+                isActive: false
+            });
 
             // 记录登出成功的安全日志
             await logSecurityEvent(userId, 'logout', {
@@ -228,27 +284,88 @@ const authController = {
                 return createFailResponse(res, 400, 'Validation failed', errors.array());
             }
 
-            // const { id: userId } = req.user;
-            const { refreshToken } = req.body;
+            const { accessToken: oldAccessToken, refreshToken } = req.body;
 
-            // const user = await User.findByPk(userId);
-            // if (!user || !user.isActive) {
-            //     return createFailResponse(res, 401, 'User not found or inactive');
-            // }
+            // console.log('oldAccessToken', oldAccessToken);
 
-            // 使用模型中自定义方法查找用户
+            // RT验证通过, 使用模型中自定义方法查找用户
             const user = await User.findByRefreshToken(refreshToken);
             if (!user) {
                 return createFailResponse(res, 401, 'Invalid or expired refresh token');
             }
 
+            // const oldAccessToken = req.token;
+
+            const decodeOldAT = verifyToken(oldAccessToken);
+            console.log('decodeOldAT', decodeOldAT);
+            
+            if (!decodeOldAT) {
+                return createFailResponse(res, 401, 'Old access token is invalid or expired');
+            }
+
+            // 查找并验证旧的会话记录, 用于防止RT被重用
+            const oldSession = await Session.findOne({
+                where: {
+                    userId: decodeOldAT.userId, // 确保RT属于正确的用户
+                    jti: {
+                        [Op.contains]: refreshToken // 确保RT没有被替换过
+                    }
+                }
+            })
+
+            // 检查会话是否存在且RT未过期, 用于用户登出, 远程登出等情况
+            if (!oldSession || oldSession.isActive || !oldSession.rtExpiresAt < new Date()) {
+                return createFailResponse(res, 401, 'Invalid or expired session or refresh token');
+            }
+
+            // 从旧的会话记录的jti字段中解析出旧的RT
+            let jtiObj;
+            try {
+                jtiObj = JSON.parse(oldSession.jti);
+            } catch (e) {
+                return createFailResponse(res, 401, 'Internal server error: corrupted session data');
+            }
+            if (jtiObj.rt !== refreshToken) {
+                return createFailResponse(res, 401, 'Invalid refresh token');
+            }
+
             // 生成新的令牌对
             const { accessToken, refreshToken: newRefreshToken } = generateTokenPair(user);
+
+            // 解码新令牌
+            const decodeNewAT = decodeToken(accessToken);
+
+            // 将旧的AT和RT加入黑名单
+            const now = Math.floor(Date.now() / 1000);
+            const oldATExpiresIn = decodeOldAT.exp - now;
+            const oldRTExpiresIn = Math.floor((new Date(oldSession.rtExpiresAt).getTime() / 1000)) - now;
+            if (oldATExpiresIn > 0) {
+                await addToBlacklist(jtiObj.at, oldATExpiresIn);
+            }
+            if (oldRTExpiresIn > 0) {
+                await addToBlacklist(jtiObj.rt, oldRTExpiresIn);
+            }
+
+            // 更新会话记录
+            await oldSession.update({
+                jti: JSON.stringify({
+                    at: decodeNewAT.jti,
+                    rt: newRefreshToken // 仍使用token本身
+                }),
+                expiresAt: new Date(decodeNewAT.exp * 1000),
+                rtExpiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+            })
 
             // 更新用户的刷新令牌哈希
             const newRefreshTokenHash = await bcrypt.hash(newRefreshToken, 10);
             await user.update({
                 refreshTokenHash: newRefreshTokenHash
+            });
+
+            // 记录刷新令牌的安全日志
+            await logSecurityEvent(user.id, 'token_refreshed', {
+                ip: req.ip,
+                userAgent: req.get('User-Agent')
             });
 
             return createSuccessResponse(res, 200, 'Token refreshed successfully', {

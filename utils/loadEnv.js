@@ -16,7 +16,6 @@ function loadEnv(base_path) {
     for (let i = envFiles.length - 1; i >= 0; i--) {
         const file = envFiles[i];
         if (fs.existsSync(file)) {
-            console.log(`Loading env from: ${file}`); // 添加日志，方便调试
             // 加载环境变量文件, 并解析私钥文件
             dotenvx.config({
                 path: file,

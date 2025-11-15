@@ -42,7 +42,7 @@ module.exports = (sequelize, DataTypes) => {
         'account_unlocked', 'two_factor_enabled', 'profile_updated',
         'two_factor_disabled', 'export_data', 'import_data',
         'user_role_updated', 'user_enabled', 'user_disabled',
-        'default_category_changed'
+        'default_category_changed', 'token_refreshed'
       ),
       allowNull: false
     },

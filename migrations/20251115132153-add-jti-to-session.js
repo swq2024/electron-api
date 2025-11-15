@@ -4,12 +4,12 @@
 module.exports = {
   async up (queryInterface, Sequelize) {
     await queryInterface.addColumn('Sessions', 'jti', {
-      type: Sequelize.STRING,
+      type: Sequelize.JSON,
+      after: 'user_id',
       allowNull: false,
-      unique: true, // 添加唯一索引, 确保查询效率
-      comment: 'JWT ID'
-    });
-    
+      defaultValue: {},
+      comment: 'JSON object containing { at: "at_jti", rt: "rt_jti" }'
+    })
   },
 
   async down (queryInterface, Sequelize) {

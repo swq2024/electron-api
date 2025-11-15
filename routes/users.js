@@ -31,12 +31,20 @@ router.put('/profile', [
 router.put('/password', [
   body('currentPassword')
     .notEmpty()
-    .withMessage('Current password is required'),
+    .withMessage('Current password is required')
+    .customSanitizer(value => value.trim()),
   body('newPassword')
     .isLength({ min: 8 })
     .withMessage('New password must be at least 8 characters long')
     .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/) // 至少包含一个小写字母，一个大写字母和一个数字
     .withMessage('New password must contain at least one lowercase letter, one uppercase letter, and one number')
+    .custom((value, { req }) => {
+      // 验证新密码是否与当前密码相同
+      if (value === req.body.currentPassword) {
+        throw new Error('New password cannot be the same as the current password');
+      }
+      return true;
+    })
 ], userController.changePassword);
 
 // 启用/禁用双因素认证

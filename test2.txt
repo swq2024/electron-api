@@ -1,0 +1,63 @@
+async changePassword(req, res) {
+        const transaction = await sequelize.transaction();
+        try {
+            const errors = validationResult(req);
+            if (!errors.isEmpty()) {
+                return createFailResponse(res, 400, 'Validation failed', errors.array());
+            }
+
+            const { id: userId } = req.user;
+            const { currentPassword, newPassword } = req.body;
+
+            const user = await User.scope('withHashes').findByPk(userId, { transaction });
+
+            if (!user) {
+                return createFailResponse(res, 404, 'User not found');
+            }
+
+            // 验证当前密码是否正确
+            const isPasswordValid = bcrypt.compareSync(currentPassword, user.passwordHash);
+            if (!isPasswordValid) {
+                return createFailResponse(res, 400, 'Current password is incorrect');
+            }
+
+            // 验证新密码是否与当前密码相同
+            // if (newPassword === currentPassword) {
+            //     return createFailResponse(res, 400, 'New password cannot be the same as the current password');
+            // }
+
+            // 更新用户密码
+            const newPasswordHash = bcrypt.hashSync(newPassword, 10);
+            await user.update({
+                passwordHash: newPasswordHash,
+            }, { transaction });
+
+            // 更新用户的token版本号，以确保所有旧令牌失效 -> 增加版本号
+            const currentTokenVersion = user.tokenVersion; // 获取当前版本号
+            await user.increment('tokenVersion', { transaction });
+
+            // 生成新版本的令牌对并更新refreshTokenHash
+            const { accessToken, refreshToken } = generateTokenPair(user);
+            const newRefreshTokenHash = bcrypt.hashSync(refreshToken, 10);
+            await user.update({
+                refreshTokenHash: newRefreshTokenHash,
+            }, { transaction });
+
+            // 记录安全日志
+            await logSecurityEvent(userId, 'password_updated', {
+                reason: `User changed password. Current token version: ${currentTokenVersion} -> New token version: ${user.tokenVersion + 1}`,
+                ip: req.ip,
+                userAgent: req.get('User-Agent')
+            }, null, transaction);
+
+            await transaction.commit();
+
+            return createSuccessResponse(res, 200, 'Password changed successfully! Your session has been secured with a new tokens.', {
+                accessToken,
+                refreshToken
+            });
+        } catch (error) {
+            console.error('Change password error:', error);
+            return createFailResponse(res, 500, 'Internal server error');
+        }
+    }

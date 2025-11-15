@@ -24,6 +24,11 @@ module.exports = (sequelize, DataTypes) => {
       allowNull: false,
       field: 'user_id'
     },
+    jti: {
+      type: DataTypes.JSON,
+      allowNull: false,
+      defaultValue: {}
+    },
     deviceInfo: {
       type: DataTypes.JSON,
       field: 'device_info'
@@ -40,6 +45,11 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.DATE,
       allowNull: false,
       field: 'expires_at'
+    },
+    rtExpiresAt: {
+      type: DataTypes.DATE,
+      allowNull: false,
+      field: 'rt_expires_at'
     },
     isActive: {
       type: DataTypes.BOOLEAN,

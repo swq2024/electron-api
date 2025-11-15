@@ -8,10 +8,10 @@ require('@dotenvx/dotenvx').config();
 module.exports = {
   async up(queryInterface, Sequelize) {
     const adminId = uuidv4();
-    const adminEmail = process.env.ADMIN_EMAIL || 'admin@example.com';
-    const adminPassword = process.env.ADMIN_PASSWORD || 'admin123'; // 仅用于开发，生产环境必须设置环境变量
+    const adminEmail = 'admin@example.com';
+    const adminPassword = 'admin123'; // 仅用于开发，生产环境必须设置环境变量
 
-    const passwordHash = await bcrypt.hash(adminPassword, 10);
+    const passwordHash = bcrypt.hashSync(adminPassword, 10);
 
     // rawSelect 方法执行一个原始的 SELECT SQL查询
     const existingAdmin = await queryInterface.rawSelect(
