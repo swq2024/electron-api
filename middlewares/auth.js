@@ -1,5 +1,5 @@
 const { verifyToken } = require('../services/authService');
-const { User } = require('../models');
+const { User, Session } = require('../models');
 const { createFailResponse } = require('../utils/response');
 const { isBlacklisted } = require('../services/blacklistService');
 
@@ -15,7 +15,7 @@ const authenticate = async (req, res, next) => {
         }
 
         const token = authHeader.substring(7); // 从Bearer Token中提取令牌值
-        
+
         /**
          * 例如：decoded = 
          * {
@@ -43,10 +43,20 @@ const authenticate = async (req, res, next) => {
             return createFailResponse(res, 401, 'Token is invalid or expired, please log in again');
         }
 
-        // 检查令牌是否在黑名单中
+        // 检查AT令牌是否在黑名单中
         const isInBlacklisted = await isBlacklisted(decoded.jti);
         if (isInBlacklisted) {
             return createFailResponse(res, 401, 'Token is invalid or expired, please log in again');
+        }
+
+        // 检查当前用户现有会话是否已被注销
+        const session = await Session.findOne({
+            where: {
+                userId: user.id,
+            }
+        })
+        if (session.expiresAt < Date.now() || !session.isActive) {
+            return createFailResponse(res, 401, 'Your session has expired or been revoked');
         }
 
         req.user = user; // 将用户信息附加到请求对象上

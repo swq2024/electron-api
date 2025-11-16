@@ -27,7 +27,8 @@ function parseUserAgent(userAgent) {
         os: `${result.os.name} ${result.os.version}`.trim() || 'Unknown OS', // 如果没有操作系统版本，默认为未知
         browser: isElectron ? 'Electron' : (result.browser.name || 'Unknown Browser'), // 如果没有浏览器名称，默认为未知
         osVersion: result.os.version || '', // 操作系统版本
-        browserVersion: result.browser.version || '' // 浏览器版本
+        browserVersion: result.browser.version || '', // 浏览器版本
+        deviceFingerprint: result.device.vendor + ' ' + result.device.model || '' // 设备指纹信息
     }
 }
 

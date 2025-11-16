@@ -105,7 +105,11 @@ const userController = {
             const { id: userId } = req.user;
             const { currentPassword, newPassword } = req.body;
 
-            const user = await User.scope('withHashes').findByPk(userId, { transaction });
+            const user = await User.scope('withHashes').findOne({
+                where: {
+                    userId
+                }
+            }, { transaction })
 
             if (!user) {
                 return createFailResponse(res, 404, 'User not found');

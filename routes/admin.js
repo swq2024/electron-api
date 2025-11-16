@@ -84,4 +84,7 @@ router.get('/security-logs', [
         .withMessage('Invalid action type')
 ], adminController.getAllSecurityLogs);
 
+// 清除 Redis 缓存
+router.delete('/redis-cache', adminController.clearRedisCache);
+
 module.exports = router;

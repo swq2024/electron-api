@@ -1,4 +1,4 @@
-const { getRedisClient } = require('./redisService');
+const redisClient = require('../services/redisService');
 
 const BLACKLIST_PREFIX = 'blacklist:';
 
@@ -11,13 +11,6 @@ const BLACKLIST_PREFIX = 'blacklist:';
 const addToBlacklist = async (jti, expiresIn) => {
     if (!jti) {
         console.error('Invalid token or missing jti for blacklisting.');
-        return false;
-    }
-
-    const redisClient = getRedisClient();
-
-    if (!redisClient) {
-        console.error('Cannot add to blacklist: Redis client not available.');
         return false;
     }
 
@@ -42,11 +35,6 @@ const addToBlacklist = async (jti, expiresIn) => {
 const isBlacklisted = async (jti) => {
     if (!jti) return false;
 
-    const redisClient = getRedisClient();
-    if (!redisClient) {
-        console.error('Cannot check blacklist: Redis client not available.');
-        return true;
-    }
     try {
         const key = `${BLACKLIST_PREFIX}${jti}`;
         const result = await redisClient.exists(key);
@@ -66,12 +54,6 @@ const isBlacklisted = async (jti) => {
  */
 const removeFromBlacklist = async (jti) => {
     if (!jti) return false;
-
-    const redisClient = getRedisClient();
-    if (!redisClient) {
-        console.error('Cannot remove from blacklist: Redis client not available.');
-        return false;
-    }
 
     try {
         const key = `${BLACKLIST_PREFIX}${jti}`;

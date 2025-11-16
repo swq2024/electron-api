@@ -11,7 +11,7 @@
  Target Server Version : 80043 (8.0.43)
  File Encoding         : 65001
 
- Date: 16/11/2025 02:53:39
+ Date: 16/11/2025 21:26:51
 */
 
 SET NAMES utf8mb4;
@@ -106,7 +106,8 @@ CREATE TABLE `securitylogs`  (
 -- ----------------------------
 -- Records of securitylogs
 -- ----------------------------
-INSERT INTO `securitylogs` VALUES ('50d20f91-b585-4aed-b31d-dbae50b9304e', '7f9e2932-a0d5-4df8-aaaa-166ad9b66600', 'account_created', '{\"source\": \"system_seeder\"}', '127.0.0.1', 'System Seeder', '2025-11-16 01:45:45', NULL);
+INSERT INTO `securitylogs` VALUES ('25aa086f-73dd-457b-ab1c-11690ae95dea', '7f9e2932-a0d5-4df8-aaaa-166ad9b66600', 'login', '{\"ip\": \"::1\", \"reason\": \"successful login[first login]\", \"userAgent\": \"Apifox/1.0.0 (https://apifox.com)\"}', '::1', 'Apifox/1.0.0 (https://apifox.com)', '2025-11-16 20:23:58', NULL);
+INSERT INTO `securitylogs` VALUES ('b0c37c69-f1b4-4c5c-8050-65a2a5cda1d9', '7f9e2932-a0d5-4df8-aaaa-166ad9b66600', 'logout', '{\"ip\": \"::1\", \"reason\": \"User requested logout\", \"userAgent\": \"Apifox/1.0.0 (https://apifox.com)\"}', '::1', 'Apifox/1.0.0 (https://apifox.com)', '2025-11-16 21:23:24', NULL);
 
 -- ----------------------------
 -- Table structure for sequelizemeta
@@ -158,6 +159,7 @@ CREATE TABLE `sessions`  (
 -- ----------------------------
 -- Records of sessions
 -- ----------------------------
+INSERT INTO `sessions` VALUES ('47a24068-ca06-45fa-a0d2-0c8ceaa46566', '7f9e2932-a0d5-4df8-aaaa-166ad9b66600', '\"{\\\"at\\\":\\\"f8fb67de-67e3-41ca-8e3c-cc59fd8a17e5\\\",\\\"rt\\\":\\\"ac844d09-4a10-4455-8aba-86f7ad9ebcc4\\\"}\"', '{\"os\": \"undefined undefined\", \"type\": \"Desktop\", \"browser\": \"Unknown Browser\", \"osVersion\": \"\", \"browserVersion\": \"\", \"deviceFingerprint\": \"undefined undefined\"}', '::1', 'Apifox/1.0.0 (https://apifox.com)', '2025-11-16 21:46:02', '2025-11-23 21:26:02', 1, '2025-11-16 20:23:58', '2025-11-16 21:26:02');
 
 -- ----------------------------
 -- Table structure for users
@@ -188,6 +190,6 @@ CREATE TABLE `users`  (
 -- ----------------------------
 -- Records of users
 -- ----------------------------
-INSERT INTO `users` VALUES ('7f9e2932-a0d5-4df8-aaaa-166ad9b66600', 'admin', 'admin@example.com', '$2b$10$YNujLMOUgXzCCyASNrd6JeUP1V87nBHLS6zlxAzL5Kb9R6yQYRUy6', 1, '$2b$10$UdyZwh2Xn/q6DCsjL8uwH..Q8.o8OY7dG13WzvuRSE5gmGDH2Og/u', 'admin', 1, '2025-11-16 02:46:44', 0, NULL, NULL, 0, NULL, '2025-11-16 01:45:45', '2025-11-16 02:46:44');
+INSERT INTO `users` VALUES ('7f9e2932-a0d5-4df8-aaaa-166ad9b66600', 'admin', 'admin@example.com', '$2b$10$YNujLMOUgXzCCyASNrd6JeUP1V87nBHLS6zlxAzL5Kb9R6yQYRUy6', 1, '$2b$10$JEN8MJ126EI6PtDEp3XJMOh47cPRP37RjBTN09jYrv7mc8RGXupm.', 'admin', 1, '2025-11-16 17:24:21', 0, NULL, NULL, 0, NULL, '2025-11-16 01:45:45', '2025-11-16 21:26:02');
 
 SET FOREIGN_KEY_CHECKS = 1;

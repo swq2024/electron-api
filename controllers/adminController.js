@@ -4,6 +4,7 @@ const { createSuccessResponse, createFailResponse } = require('../utils/response
 const { logSecurityEvent } = require('../utils/logger');
 const { Op } = require('sequelize');
 const { parseBoolean } = require('../utils/parsers');
+const redisClient = require('../services/redisService');
 
 const adminController = {
     // 获取用户列表
@@ -123,7 +124,7 @@ const adminController = {
             if (!errors.isEmpty()) {
                 return createFailResponse(res, 400, 'Validation error', errors.array());
             }
-            
+
             const { id } = req.params;
             const { isActive } = req.body;
             const { id: adminId } = req.user; // 获取当前管理员的ID
@@ -142,7 +143,7 @@ const adminController = {
 
             // 更新用户状态
             await user.update({ isActive: parsedIsActive });
-            
+
             // 记录安全日志
             await logSecurityEvent(adminId, parsedIsActive ? 'user_enabled' : 'user_disabled', {
                 targetUserId: user.id,
@@ -269,6 +270,20 @@ const adminController = {
         } catch (error) {
             console.error('Get security logs error:', error);
             return createFailResponse(res, 500, 'Internal server error');
+        }
+    },
+
+    // 清除 Redis 缓存
+    async clearRedisCache(req, res) {
+        try {
+            await redisClient.clearAll(); // 清空所有数据库中的数据
+
+            return createSuccessResponse(res, 200, 'Redis cache cleared successfully');
+        } catch (error) {
+            console.error('Clear cache error:', error);
+            return createFailResponse(res, 500, 'Internal server error');
+        } finally {
+            await redisClient.quit(); // 关闭 Redis 连接
         }
     }
 }
