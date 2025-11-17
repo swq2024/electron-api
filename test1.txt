@@ -1,95 +1,75 @@
-    async refreshToken(req, res) {
-        try {
-            const errors = validationResult(req);
-            if (!errors.isEmpty()) {
-                return createFailResponse(res, 400, 'Validation failed', errors.array());
-            }
+const multer = require('multer');
+const createError = require('http-errors');
+const logger = require('../utils/logger');
 
-            const { refreshToken } = req.body;
-
-            // RT验证通过, 使用模型中自定义方法查找用户
-            const user = await User.findByRefreshToken(refreshToken);
-            if (!user) {
-                return createFailResponse(res, 401, 'Invalid or expired refresh token');
-            }
-
-            const oldAccessToken = req.token;
-            const decodeOldAT = verifyToken(oldAccessToken);
-            if (!decodeOldAT) {
-                return createFailResponse(res, 401, 'Old access token is invalid or expired');
-            }
-
-            // 查找并验证旧的会话记录, 用于防止RT被重用
-            const oldSession = await Session.findOne({
-                where: {
-                    userId: decodeOldAT.userId, // 确保RT属于正确的用户
-                    jti: {
-                        [Op.contains]: refreshToken // 确保RT没有被替换过
-                    }
-                }
-            })
-
-            // 检查会话是否存在且RT未过期, 用于用户登出, 远程登出等情况
-            if (!oldSession || oldSession.isActive || !oldSession.rtExpiresAt < new Date()) {
-                return createFailResponse(res, 401, 'Invalid or expired session or refresh token');
-            }
-
-            // 从旧的会话记录的jti字段中解析出旧的RT
-            let jtiObj;
-            try {
-                jtiObj = JSON.parse(oldSession.jti);
-            } catch (e) {
-                return createFailResponse(res, 401, 'Internal server error: corrupted session data');
-            }
-            if (jtiObj.rt !== refreshToken) {
-                return createFailResponse(res, 401, 'Invalid refresh token');
-            }
-
-            // 生成新的令牌对
-            const { accessToken, refreshToken: newRefreshToken } = generateTokenPair(user);
-
-            // 解码新令牌
-            const decodeNewAT = decodeToken(accessToken);
-
-            // 将旧的AT和RT加入黑名单
-            const now = Math.floor(Date.now() / 1000);
-            const oldATExpiresIn = decodeOldAT.exp - now;
-            const oldRTExpiresIn = Math.floor((new Date(oldSession.rtExpiresAt).getTime() / 1000)) - now;
-            if (oldATExpiresIn > 0) {
-                await addToBlacklist(jtiObj.at, oldATExpiresIn);
-            }
-            if (oldRTExpiresIn > 0) {
-                await addToBlacklist(jtiObj.rt, oldRTExpiresIn);
-            }
-
-            // 更新会话记录
-            await oldSession.update({
-                jti: JSON.stringify({
-                    at: decodeNewAT.jti,
-                    rt: newRefreshToken // 仍使用token本身
-                }),
-                expiresAt: new Date(decodeNewAT.exp * 1000),
-                rtExpiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
-            })
-
-            // 更新用户的刷新令牌哈希
-            const newRefreshTokenHash = await bcrypt.hash(newRefreshToken, 10);
-            await user.update({
-                refreshTokenHash: newRefreshTokenHash
-            });
-
-            // 记录刷新令牌的安全日志
-            await logSecurityEvent(user.id, 'token_refreshed', {
-                ip: req.ip,
-                userAgent: req.get('User-Agent')
-            });
-
-            return createSuccessResponse(res, 200, 'Token refreshed successfully', {
-                accessToken,
-                refreshToken: newRefreshToken
-            });
-        } catch (error) {
-            console.error('Error during refreshing token:', error);
-            return createFailResponse(res, 500, 'Internal server error');
-        }
+/**
+ * 请求成功
+ * @param res
+ * @param message
+ * @param data
+ * @param code
+ */
+const success = (res, message, data = {}, code = 200) => {
+  res.status(code).json({
+    status: true,
+    message,
+    data,
+  });
+};
+/**
+ * 请求失败
+ * @param res
+ * @param error
+ */
+const failure = (res, error) => {
+  // 默认响应为 500，服务器错误
+  let statusCode;
+  let errors;
+  if (error.name === 'SequelizeValidationError') {
+    // Sequelize 验证错误
+    statusCode = 400;
+    errors = error.errors.map((e) => e.message);
+  } else if (error.name === 'SequelizeOptimisticLockError') {
+    // 乐观锁错误
+    statusCode = 409;
+    errors = '请求冲突，您提交的数据已被修改，请稍后重试。';
+  } else if (error.name === 'JsonWebTokenError' || error.name === 'TokenExpiredError') {
+    // Token 验证错误
+    statusCode = 401;
+    errors = '您提交的 token 错误或已过期。';
+  } else if (error instanceof createError.HttpError) {
+    // http-errors 库创建的错误
+    statusCode = error.status;
+    errors = error.message;
+  } else if (error instanceof multer.MulterError) {
+    if (error.code === 'LIMIT_FILE_SIZE') {
+      statusCode = 413;
+      errors = '文件大小超出限制。';
+    } else {
+      statusCode = 400;
+      errors = error.message;
     }
+  } else {
+    statusCode = 500;
+    errors = '服务器错误';
+    logger.error('服务器错误', error); // 其他未知错误, 记录错误日志写入数据库
+  }
+
+  res.status(statusCode).json({
+    status: false,
+    message: `请求失败: ${error.name}`,
+    errors: Array.isArray(errors) ? errors : [errors],
+  });
+};
+
+module.exports = {
+  success,
+  failure,
+};
+
+return sendErr(res, {
+                    isOperational: true,
+                    statusCode: 400,
+                    message: 'Validation failed',
+                    errors: errors.array()
+                });

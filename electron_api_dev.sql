@@ -11,7 +11,7 @@
  Target Server Version : 80043 (8.0.43)
  File Encoding         : 65001
 
- Date: 16/11/2025 21:26:51
+ Date: 17/11/2025 23:38:14
 */
 
 SET NAMES utf8mb4;
@@ -36,7 +36,27 @@ CREATE TABLE `categories`  (
 -- ----------------------------
 -- Records of categories
 -- ----------------------------
-INSERT INTO `categories` VALUES ('fabb1853-fe14-4c1a-a6f5-a9afe6b86f1e', '7f9e2932-a0d5-4df8-aaaa-166ad9b66600', 'General', '#95a5a6', 'folder', 1, '2025-11-16 01:45:45', '2025-11-16 01:45:45');
+INSERT INTO `categories` VALUES ('a06a19b2-ffef-44d4-9eed-730cbdec53a7', '7f9e2932-a0d5-4df8-aaaa-166ad9b66600', '游戏平台', '#3498db', 'folder', 0, '2025-11-17 18:42:46', '2025-11-17 23:26:54');
+INSERT INTO `categories` VALUES ('fabb1853-fe14-4c1a-a6f5-a9afe6b86f1e', '7f9e2932-a0d5-4df8-aaaa-166ad9b66600', 'General', '#95a5a6', 'folder', 1, '2025-11-16 01:45:45', '2025-11-17 23:26:54');
+
+-- ----------------------------
+-- Table structure for logs
+-- ----------------------------
+DROP TABLE IF EXISTS `logs`;
+CREATE TABLE `logs`  (
+  `id` int UNSIGNED NOT NULL AUTO_INCREMENT,
+  `level` varchar(16) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL,
+  `message` varchar(2048) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL,
+  `meta` varchar(2048) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL,
+  `timestamp` datetime NOT NULL,
+  PRIMARY KEY (`id`) USING BTREE
+) ENGINE = InnoDB AUTO_INCREMENT = 3 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_general_ci ROW_FORMAT = Dynamic;
+
+-- ----------------------------
+-- Records of logs
+-- ----------------------------
+INSERT INTO `logs` VALUES (1, 'error', '服务器未知错误: log is not defined', '{\"service\":\"keyVault-log-service\",\"stack\":\"ReferenceError: log is not defined\\n    at changePassword (F:\\\\electron\\\\backend-service\\\\controllers\\\\userController.js:130:13)\\n    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)\"}', '2025-11-17 18:35:39');
+INSERT INTO `logs` VALUES (2, 'error', '服务器未知错误: Assignment to constant variable.', '{\"service\":\"keyVault-log-service\",\"stack\":\"TypeError: Assignment to constant variable.\\n    at generate (F:\\\\electron\\\\backend-service\\\\controllers\\\\passwordGeneratorController.js:47:26)\\n    at Layer.handle [as handle_request] (F:\\\\electron\\\\backend-service\\\\node_modules\\\\express\\\\lib\\\\router\\\\layer.js:95:5)\\n    at next (F:\\\\electron\\\\backend-service\\\\node_modules\\\\express\\\\lib\\\\router\\\\route.js:137:13)\\n    at Route.dispatch (F:\\\\electron\\\\backend-service\\\\node_modules\\\\express\\\\lib\\\\router\\\\route.js:112:3)\\n    at Layer.handle [as handle_request] (F:\\\\electron\\\\backend-service\\\\node_modules\\\\express\\\\lib\\\\router\\\\layer.js:95:5)\\n    at F:\\\\electron\\\\backend-service\\\\node_modules\\\\express\\\\lib\\\\router\\\\index.js:281:22\\n    at Function.process_params (F:\\\\electron\\\\backend-service\\\\node_modules\\\\express\\\\lib\\\\router\\\\index.js:335:12)\\n    at next (F:\\\\electron\\\\backend-service\\\\node_modules\\\\express\\\\lib\\\\router\\\\index.js:275:10)\\n    at authenticate (F:\\\\electron\\\\backend-service\\\\middlewares\\\\auth.js:95:9)\\n    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)\"}', '2025-11-17 23:14:57');
 
 -- ----------------------------
 -- Table structure for passwordhistories
@@ -106,8 +126,27 @@ CREATE TABLE `securitylogs`  (
 -- ----------------------------
 -- Records of securitylogs
 -- ----------------------------
+INSERT INTO `securitylogs` VALUES ('0bdc0e32-b995-45ac-898e-abdaa8bd90b6', '7f9e2932-a0d5-4df8-aaaa-166ad9b66600', 'token_refreshed', '{\"ip\": \"::1\", \"userAgent\": \"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) electron-app/1.0.0 Chrome/140.0.7339.240 Electron/38.4.0 Safari/537.36\"}', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) electron-app/1.0.0 Chrome/140.0.7339.240 Electron/38.4.0 Safari/537.36', '2025-11-17 14:53:15', NULL);
+INSERT INTO `securitylogs` VALUES ('10492c91-4b97-419d-b971-7cd1a14f3345', '7f9e2932-a0d5-4df8-aaaa-166ad9b66600', 'export_data', '{\"ip\": \"::1\", \"count\": 0, \"format\": \"json\", \"userAgent\": \"Apifox/1.0.0 (https://apifox.com)\"}', '::1', 'Apifox/1.0.0 (https://apifox.com)', '2025-11-17 18:42:35', NULL);
 INSERT INTO `securitylogs` VALUES ('25aa086f-73dd-457b-ab1c-11690ae95dea', '7f9e2932-a0d5-4df8-aaaa-166ad9b66600', 'login', '{\"ip\": \"::1\", \"reason\": \"successful login[first login]\", \"userAgent\": \"Apifox/1.0.0 (https://apifox.com)\"}', '::1', 'Apifox/1.0.0 (https://apifox.com)', '2025-11-16 20:23:58', NULL);
+INSERT INTO `securitylogs` VALUES ('271d13b2-1da4-499f-bdf3-bd63f8fe2e45', '7f9e2932-a0d5-4df8-aaaa-166ad9b66600', 'import_data', '{\"ip\": \"::1\", \"count\": 1, \"format\": \"json\", \"userAgent\": \"Apifox/1.0.0 (https://apifox.com)\"}', '::1', 'Apifox/1.0.0 (https://apifox.com)', '2025-11-17 18:42:46', NULL);
+INSERT INTO `securitylogs` VALUES ('3853ef75-f1e5-4962-b58e-5e2f38629095', '7f9e2932-a0d5-4df8-aaaa-166ad9b66600', 'default_category_changed', '{\"ip\": \"::1\", \"userAgent\": \"Apifox/1.0.0 (https://apifox.com)\", \"newDefaultCategoryId\": \"a06a19b2-ffef-44d4-9eed-730cbdec53a7\", \"oldDefaultCategoryId\": \"fabb1853-fe14-4c1a-a6f5-a9afe6b86f1e\", \"transferredPasswordCount\": 0}', '::1', 'Apifox/1.0.0 (https://apifox.com)', '2025-11-17 23:26:17', NULL);
+INSERT INTO `securitylogs` VALUES ('3a38c42a-c331-4119-8b7a-2f0dad5e9c88', '7f9e2932-a0d5-4df8-aaaa-166ad9b66600', 'token_refreshed', '{\"ip\": \"::1\", \"userAgent\": \"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) electron-app/1.0.0 Chrome/140.0.7339.240 Electron/38.4.0 Safari/537.36\"}', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) electron-app/1.0.0 Chrome/140.0.7339.240 Electron/38.4.0 Safari/537.36', '2025-11-17 13:21:20', NULL);
+INSERT INTO `securitylogs` VALUES ('3c8cda2a-64aa-440e-b583-228a7a0ae0dc', '7f9e2932-a0d5-4df8-aaaa-166ad9b66600', 'token_refreshed', '{\"ip\": \"::1\", \"userAgent\": \"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) electron-app/1.0.0 Chrome/140.0.7339.240 Electron/38.4.0 Safari/537.36\"}', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) electron-app/1.0.0 Chrome/140.0.7339.240 Electron/38.4.0 Safari/537.36', '2025-11-16 22:02:31', NULL);
+INSERT INTO `securitylogs` VALUES ('4b82f7d5-b5eb-4e57-a519-fa2535f68cc0', '7f9e2932-a0d5-4df8-aaaa-166ad9b66600', 'token_refreshed', '{\"ip\": \"::1\", \"userAgent\": \"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) electron-app/1.0.0 Chrome/140.0.7339.240 Electron/38.4.0 Safari/537.36\"}', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) electron-app/1.0.0 Chrome/140.0.7339.240 Electron/38.4.0 Safari/537.36', '2025-11-16 22:02:00', NULL);
+INSERT INTO `securitylogs` VALUES ('57e7083d-e39f-4a04-8368-81776036661e', '7f9e2932-a0d5-4df8-aaaa-166ad9b66600', 'token_refreshed', '{\"ip\": \"::1\", \"userAgent\": \"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) electron-app/1.0.0 Chrome/140.0.7339.240 Electron/38.4.0 Safari/537.36\"}', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) electron-app/1.0.0 Chrome/140.0.7339.240 Electron/38.4.0 Safari/537.36', '2025-11-16 22:17:27', NULL);
+INSERT INTO `securitylogs` VALUES ('593d1dd0-68a1-4b54-b699-e99c0d50a478', '7f9e2932-a0d5-4df8-aaaa-166ad9b66600', 'token_refreshed', '{\"ip\": \"::1\", \"userAgent\": \"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) electron-app/1.0.0 Chrome/140.0.7339.240 Electron/38.4.0 Safari/537.36\"}', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) electron-app/1.0.0 Chrome/140.0.7339.240 Electron/38.4.0 Safari/537.36', '2025-11-17 13:21:35', NULL);
+INSERT INTO `securitylogs` VALUES ('8387644b-1b74-4fab-890e-0376297a0323', '7f9e2932-a0d5-4df8-aaaa-166ad9b66600', 'default_category_changed', '{\"ip\": \"::1\", \"userAgent\": \"Apifox/1.0.0 (https://apifox.com)\", \"newDefaultCategoryId\": \"fabb1853-fe14-4c1a-a6f5-a9afe6b86f1e\", \"oldDefaultCategoryId\": \"a06a19b2-ffef-44d4-9eed-730cbdec53a7\", \"transferredPasswordCount\": 2}', '::1', 'Apifox/1.0.0 (https://apifox.com)', '2025-11-17 23:26:54', NULL);
+INSERT INTO `securitylogs` VALUES ('8609dd27-4c54-4cff-a2de-449fe6df5c9b', '7f9e2932-a0d5-4df8-aaaa-166ad9b66600', 'token_refreshed', '{\"ip\": \"::1\", \"userAgent\": \"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) electron-app/1.0.0 Chrome/140.0.7339.240 Electron/38.4.0 Safari/537.36\"}', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) electron-app/1.0.0 Chrome/140.0.7339.240 Electron/38.4.0 Safari/537.36', '2025-11-16 23:22:25', NULL);
+INSERT INTO `securitylogs` VALUES ('8e6e6832-48d4-4d07-8bb3-d9f0873fa3e8', '7f9e2932-a0d5-4df8-aaaa-166ad9b66600', 'token_refreshed', '{\"ip\": \"::1\", \"userAgent\": \"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) electron-app/1.0.0 Chrome/140.0.7339.240 Electron/38.4.0 Safari/537.36\"}', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) electron-app/1.0.0 Chrome/140.0.7339.240 Electron/38.4.0 Safari/537.36', '2025-11-16 22:02:15', NULL);
+INSERT INTO `securitylogs` VALUES ('9b3eef36-7c50-401d-a5fd-934b3124eca1', '7f9e2932-a0d5-4df8-aaaa-166ad9b66600', 'password_updated', '{\"ip\": \"::1\", \"reason\": \"User changed password. Current token version: 1 -> New token version: 2\", \"userAgent\": \"Apifox/1.0.0 (https://apifox.com)\"}', '::1', 'Apifox/1.0.0 (https://apifox.com)', '2025-11-17 18:36:11', NULL);
+INSERT INTO `securitylogs` VALUES ('a6e92d62-75b7-4d9f-b486-520df34ad0e3', '7f9e2932-a0d5-4df8-aaaa-166ad9b66600', 'token_refreshed', '{\"ip\": \"::1\", \"userAgent\": \"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) electron-app/1.0.0 Chrome/140.0.7339.240 Electron/38.4.0 Safari/537.36\"}', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) electron-app/1.0.0 Chrome/140.0.7339.240 Electron/38.4.0 Safari/537.36', '2025-11-16 23:07:50', NULL);
 INSERT INTO `securitylogs` VALUES ('b0c37c69-f1b4-4c5c-8050-65a2a5cda1d9', '7f9e2932-a0d5-4df8-aaaa-166ad9b66600', 'logout', '{\"ip\": \"::1\", \"reason\": \"User requested logout\", \"userAgent\": \"Apifox/1.0.0 (https://apifox.com)\"}', '::1', 'Apifox/1.0.0 (https://apifox.com)', '2025-11-16 21:23:24', NULL);
+INSERT INTO `securitylogs` VALUES ('ca31d7d9-04f6-4a6a-8791-c902024570c0', '7f9e2932-a0d5-4df8-aaaa-166ad9b66600', 'token_refreshed', '{\"ip\": \"::1\", \"userAgent\": \"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) electron-app/1.0.0 Chrome/140.0.7339.240 Electron/38.4.0 Safari/537.36\"}', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) electron-app/1.0.0 Chrome/140.0.7339.240 Electron/38.4.0 Safari/537.36', '2025-11-16 22:01:31', NULL);
+INSERT INTO `securitylogs` VALUES ('cd4f6c80-8a91-4ec2-b810-d011c8c09820', '7f9e2932-a0d5-4df8-aaaa-166ad9b66600', 'user_enabled', '{\"ip\": \"::1\", \"newStatus\": \"active\", \"userAgent\": \"Apifox/1.0.0 (https://apifox.com)\", \"targetUserId\": \"7f9e2932-a0d5-4df8-aaaa-166ad9b66600\"}', '::1', 'Apifox/1.0.0 (https://apifox.com)', '2025-11-17 23:23:11', NULL);
+INSERT INTO `securitylogs` VALUES ('d029385f-1ba9-4127-bcf7-3f2cf32b9af0', '7f9e2932-a0d5-4df8-aaaa-166ad9b66600', 'export_data', '{\"ip\": \"::1\", \"count\": 1, \"format\": \"json\", \"userAgent\": \"Apifox/1.0.0 (https://apifox.com)\"}', '::1', 'Apifox/1.0.0 (https://apifox.com)', '2025-11-17 18:44:02', NULL);
+INSERT INTO `securitylogs` VALUES ('e1df05c9-573e-4b22-b88f-af4ba48179cf', '7f9e2932-a0d5-4df8-aaaa-166ad9b66600', 'token_refreshed', '{\"ip\": \"::1\", \"userAgent\": \"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) electron-app/1.0.0 Chrome/140.0.7339.240 Electron/38.4.0 Safari/537.36\"}', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) electron-app/1.0.0 Chrome/140.0.7339.240 Electron/38.4.0 Safari/537.36', '2025-11-17 14:43:28', NULL);
+INSERT INTO `securitylogs` VALUES ('eff46876-c4f3-4b65-b3e9-cfb5e46327c2', '7f9e2932-a0d5-4df8-aaaa-166ad9b66600', 'token_refreshed', '{\"ip\": \"::1\", \"userAgent\": \"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) electron-app/1.0.0 Chrome/140.0.7339.240 Electron/38.4.0 Safari/537.36\"}', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) electron-app/1.0.0 Chrome/140.0.7339.240 Electron/38.4.0 Safari/537.36', '2025-11-16 22:02:57', NULL);
 
 -- ----------------------------
 -- Table structure for sequelizemeta
@@ -136,6 +175,7 @@ INSERT INTO `sequelizemeta` VALUES ('20251114052726-add-auth-fields-to-user.js')
 INSERT INTO `sequelizemeta` VALUES ('20251114063604-remove-salt-from-user.js');
 INSERT INTO `sequelizemeta` VALUES ('20251115132153-add-jti-to-session.js');
 INSERT INTO `sequelizemeta` VALUES ('20251115152245-add-rtExpires-at-to-session.js');
+INSERT INTO `sequelizemeta` VALUES ('20251117102818-create-log.js');
 
 -- ----------------------------
 -- Table structure for sessions
@@ -159,7 +199,7 @@ CREATE TABLE `sessions`  (
 -- ----------------------------
 -- Records of sessions
 -- ----------------------------
-INSERT INTO `sessions` VALUES ('47a24068-ca06-45fa-a0d2-0c8ceaa46566', '7f9e2932-a0d5-4df8-aaaa-166ad9b66600', '\"{\\\"at\\\":\\\"f8fb67de-67e3-41ca-8e3c-cc59fd8a17e5\\\",\\\"rt\\\":\\\"ac844d09-4a10-4455-8aba-86f7ad9ebcc4\\\"}\"', '{\"os\": \"undefined undefined\", \"type\": \"Desktop\", \"browser\": \"Unknown Browser\", \"osVersion\": \"\", \"browserVersion\": \"\", \"deviceFingerprint\": \"undefined undefined\"}', '::1', 'Apifox/1.0.0 (https://apifox.com)', '2025-11-16 21:46:02', '2025-11-23 21:26:02', 1, '2025-11-16 20:23:58', '2025-11-16 21:26:02');
+INSERT INTO `sessions` VALUES ('47a24068-ca06-45fa-a0d2-0c8ceaa46566', '7f9e2932-a0d5-4df8-aaaa-166ad9b66600', '\"{\\\"at\\\":\\\"1b8dff9b-57de-40d7-b576-5f7b85aebbf2\\\",\\\"rt\\\":\\\"a6906149-34b5-4add-b21e-82fcc236d551\\\"}\"', '{\"os\": \"undefined undefined\", \"type\": \"Desktop\", \"browser\": \"Unknown Browser\", \"osVersion\": \"\", \"browserVersion\": \"\", \"deviceFingerprint\": \"undefined undefined\"}', '::1', 'Apifox/1.0.0 (https://apifox.com)', '2025-11-17 23:51:00', '2025-11-24 23:31:00', 1, '2025-11-16 20:23:58', '2025-11-17 23:31:00');
 
 -- ----------------------------
 -- Table structure for users
@@ -190,6 +230,6 @@ CREATE TABLE `users`  (
 -- ----------------------------
 -- Records of users
 -- ----------------------------
-INSERT INTO `users` VALUES ('7f9e2932-a0d5-4df8-aaaa-166ad9b66600', 'admin', 'admin@example.com', '$2b$10$YNujLMOUgXzCCyASNrd6JeUP1V87nBHLS6zlxAzL5Kb9R6yQYRUy6', 1, '$2b$10$JEN8MJ126EI6PtDEp3XJMOh47cPRP37RjBTN09jYrv7mc8RGXupm.', 'admin', 1, '2025-11-16 17:24:21', 0, NULL, NULL, 0, NULL, '2025-11-16 01:45:45', '2025-11-16 21:26:02');
+INSERT INTO `users` VALUES ('7f9e2932-a0d5-4df8-aaaa-166ad9b66600', 'admin123', 'admin@example.com', '$2b$10$gHUT7vO.ygGjpjvQrPxRNuJF1KM.dLVpprHsLZpQ5hRMXuspYT7CO', 2, '$2b$10$TT3oh5wZjCu6kXgLUZ4LkO/2OnZbN6GdbIAc7Sf9UK/cA8O9S0wWS', 'admin', 1, '2025-11-17 18:36:50', 0, NULL, NULL, 0, NULL, '2025-11-16 01:45:45', '2025-11-17 23:31:00');
 
 SET FOREIGN_KEY_CHECKS = 1;

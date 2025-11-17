@@ -1,7 +1,7 @@
 const { Password, Category } = require('../models');
 const { encrypt, decrypt } = require('../services/encryptionService');
 const { calculatePasswordStrength } = require('../services/passwordService');
-const { createSuccessResponse, createFailResponse } = require('../utils/response');
+const { sendOk, sendErr } = require('../utils/response');
 const { logSecurityEvent } = require('../utils/logger');
 const csv = require('csv-parser');
 const fs = require('fs');
@@ -61,13 +61,13 @@ const importExportController = {
                 return res.send(csvData);
             } else {
                 // 返回JSON格式
-                return createSuccessResponse(res, 200, 'Passwords exported successfully', {
+                return sendOk(res, 200, '密码导出成功', {
                     passwords: decryptedPasswords
                 });
             }
         } catch (error) {
-            console.error('Export passwords error:', error);
-            return createFailResponse(res, 500, 'Internal server error');
+            console.error('密码导出失败', error);
+            return sendErr(res, error);
         }
     },
 
@@ -85,7 +85,11 @@ const importExportController = {
             const passwords = [req.body];
 
             if (format === 'json' && !passwords) {
-                return createFailResponse(res, 400, 'Passwords data is required for JSON import');
+                return sendErr(res, {
+                    isOperational: true,
+                    statusCode: 400,
+                    message: '导入数据格式错误(json)'
+                });
             }
 
             let importedPasswords = [];
@@ -249,7 +253,7 @@ const importExportController = {
                                 // 删除临时文件
                                 fs.unlinkSync(req.file.path);
 
-                                resolve(createSuccessResponse(res, 200, 'Passwords imported successfully', {
+                                resolve(sendOk(res, 200, '密码导入成功', {
                                     imported: importedPasswords.length,
                                     passwords: importedPasswords
                                 }));
@@ -259,7 +263,11 @@ const importExportController = {
                         });
                 });
             } else {
-                return createFailResponse(res, 400, 'Invalid import format');
+                return sendErr(res, {
+                    isOperational: true,
+                    statusCode: 400,
+                    message: '不支持的文件格式'
+                });
             }
 
             // 记录安全事件日志
@@ -272,13 +280,13 @@ const importExportController = {
                 });
             }
 
-            return createSuccessResponse(res, 200, 'Passwords imported successfully', {
+            return sendOk(res, 200, '密码导入成功', {
                 imported: importedPasswords.length,
                 passwords: importedPasswords
             });
         } catch (error) {
-            console.error('Import passwords error:', error);
-            return createFailResponse(res, 500, 'Internal server error');
+            console.error('密码导入失败', error);
+            return sendErr(res, error);
         }
     }
 };

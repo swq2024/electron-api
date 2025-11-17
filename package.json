@@ -28,6 +28,8 @@
     "sequelize": "^6.37.7",
     "ua-parser-js": "^2.0.6",
     "uuid": "^13.0.0",
-    "vary": "^1.1.2"
+    "vary": "^1.1.2",
+    "winston": "^3.18.3",
+    "winston-mysql": "^1.1.1"
   }
 }

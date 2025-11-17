@@ -1,10 +1,11 @@
 const { User, SecurityLog, sequelize } = require('../models');
 const { validationResult } = require('express-validator');
-const { createSuccessResponse, createFailResponse } = require('../utils/response');
+const { sendOk, sendErr } = require('../utils/response');
 const { logSecurityEvent } = require('../utils/logger');
 const bcrypt = require('bcrypt');
 const { Op } = require('sequelize');
 const { generateTokenPair } = require('../services/authService');
+const { parseBoolean } = require('../utils/parsers');
 
 const userController = {
     // 获取个人信息
@@ -19,15 +20,17 @@ const userController = {
             });
 
             if (!user) {
-                return createFailResponse(res, 404, 'User not found');
+                return sendErr(res, {
+                    isOperational: true,
+                    statusCode: 404,
+                    message: '用户不存在'
+                });
             }
 
-            return createSuccessResponse(res, 200, 'User profile retrieved successfully', {
-                user
-            });
+            return sendOk(res, 200, '用户信息检索成功', { user });
         } catch (error) {
-            console.error('Get user profile error:', error);
-            return createFailResponse(res, 500, 'Internal server error');
+            console.error('用户信息检索失败', error);
+            return sendErr(res, error);
         }
     },
 
@@ -36,7 +39,12 @@ const userController = {
         try {
             const errors = validationResult(req);
             if (!errors.isEmpty()) {
-                return createFailResponse(res, 400, 'Validation failed', errors.array());
+                return sendErr(res, {
+                    isOperational: true,
+                    statusCode: 400,
+                    message: 'Validation failed',
+                    errors: errors.array()
+                });
             }
 
             const { id: userId } = req.user;
@@ -45,7 +53,11 @@ const userController = {
             const user = await User.findByPk(userId);
 
             if (!user) {
-                return createFailResponse(res, 404, 'User not found');
+                return sendErr(res, {
+                    isOperational: true,
+                    statusCode: 404,
+                    message: '用户不存在'
+                });
             }
 
             // 检查用户名和邮箱是否已被其他用户使用
@@ -57,7 +69,11 @@ const userController = {
                     }
                 });
                 if (existingUser) {
-                    return createFailResponse(res, 400, 'Username already in use');
+                    return sendErr(res, {
+                        isOperational: true,
+                        statusCode: 400,
+                        message: '用户名已被其他用户使用'
+                    });
                 }
             }
 
@@ -69,7 +85,11 @@ const userController = {
                     }
                 });
                 if (existingUser) {
-                    return createFailResponse(res, 400, 'Email already in use');
+                    return sendErr(res, {
+                        isOperational: true,
+                        statusCode: 400,
+                        message: '邮箱已被其他用户使用'
+                    });
                 }
             }
 
@@ -86,10 +106,10 @@ const userController = {
                 userAgent: req.get('User-Agent')
             });
 
-            return createSuccessResponse(res, 200, 'User profile updated successfully');
+            return sendOk(res, 200, '更新用户信息成功');
         } catch (error) {
-            console.error('Update user profile error:', error);
-            return createFailResponse(res, 500, 'Internal server error');
+            console.error('更新用户信息失败', error);
+            return sendErr(res, error);
         }
     },
 
@@ -99,7 +119,12 @@ const userController = {
         try {
             const errors = validationResult(req);
             if (!errors.isEmpty()) {
-                return createFailResponse(res, 400, 'Validation failed', errors.array());
+                return sendErr(res, {
+                    isOperational: true,
+                    statusCode: 400,
+                    message: 'Validation failed',
+                    errors: errors.array()
+                });
             }
 
             const { id: userId } = req.user;
@@ -107,19 +132,27 @@ const userController = {
 
             const user = await User.scope('withHashes').findOne({
                 where: {
-                    userId
+                    id: userId
                 }
             }, { transaction })
 
             if (!user) {
-                return createFailResponse(res, 404, 'User not found');
+                return sendErr(res, {
+                    isOperational: true,
+                    statusCode: 404,
+                    message: '用户不存在'
+                });
             }
 
             // 验证当前密码是否正确
             const isPasswordValid = bcrypt.compareSync(currentPassword, user.passwordHash);
             if (!isPasswordValid) {
                 await transaction.rollback();
-                return createFailResponse(res, 400, 'Current password is incorrect');
+                return sendErr(res, {
+                    isOperational: true,
+                    statusCode: 400,
+                    message: '当前密码不正确'
+                });
             }
 
             // 验证新密码是否与当前密码相同, 已经在路由中使用了自定义验证规则，此处不再重复验证
@@ -150,13 +183,14 @@ const userController = {
 
             await transaction.commit();
 
-            return createSuccessResponse(res, 200, 'Password changed successfully! Your session has been secured with a new tokens.', {
+            return sendOk(res, 200, '密码已成功更改', {
                 accessToken,
                 refreshToken
             });
         } catch (error) {
-            console.error('Change password error:', error);
-            return createFailResponse(res, 500, 'Internal server error');
+            await transaction.rollback();
+            console.error('更改密码失败', error);
+            return sendErr(res, error);
         }
     },
 
@@ -169,34 +203,47 @@ const userController = {
             const user = await User.findByPk(userId);
 
             if (!user) {
-                return createFailResponse(res, 404, 'User not found');
+                return sendErr(res, {
+                    isOperational: true,
+                    statusCode: 404,
+                    message: '用户不存在'
+                });
             }
+            const parsedEnable = parseBoolean(enable);
 
-            if (enable && !secret) {
-                return createFailResponse(res, 400, 'Secret is required to enable two-factor authentication');
+            if (parsedEnable && !secret) {
+                return sendErr(res, {
+                    isOperational: true,
+                    statusCode: 400,
+                    message: '启用双因素认证时，必须提供密钥'
+                });
             }
 
             // 验证密钥的有效性（此处仅为示例，实际应用中应进行更复杂的校验）
-            // if (enable && !validateSecret(secret)) {
-            //     return createFailResponse(res, 400, 'Invalid secret for two-factor authentication');
+            // if (parsedEnable && !validateSecret(secret)) {
+            //     return sendErr(res, {
+            //         isOperational: true,
+            //         statusCode: 400,
+            //         message: '无效的密钥'
+            //     });
             // }
 
             // 更新双因素认证状态和密钥
             await user.update({
-                twoFactorEnabled: enable,
-                twoFactorSecret: enable ? secret : null
+                twoFactorEnabled: parsedEnable,
+                twoFactorSecret: parsedEnable ? secret : null
             });
 
             // 记录安全日志
-            await logSecurityEvent(req, enable ? 'two_factor_enabled' : 'two_factor_disabled', {
+            await logSecurityEvent(req, parsedEnable ? 'two_factor_enabled' : 'two_factor_disabled', {
                 ip: req.ip,
                 userAgent: req.get('User-Agent')
             });
 
-            return createSuccessResponse(res, 200, `Two-factor authentication ${enable ? 'enabled' : 'disabled'} successfully`);
+            return sendOk(res, 200, `双因素认证已${parsedEnable ? '启用' : '禁用'}`);
         } catch (error) {
-            console.error('Toggle two-factor authentication error:', error);
-            return createFailResponse(res, 500, 'Internal server error');
+            console.error('启用/禁用双因素认证失败', error);
+            return sendErr(res, error);
         }
     },
 
@@ -219,7 +266,7 @@ const userController = {
                 limit: parseInt(limit)
             });
 
-            return createSuccessResponse(res, 200, 'Security logs retrieved successfully', {
+            return sendOk(res, 200, '安全日志检索成功', {
                 logs,
                 pagination: {
                     total: count,
@@ -228,9 +275,10 @@ const userController = {
                     totalPages: Math.ceil(count / limit)
                 }
             });
+
         } catch (error) {
-            console.error('Get security logs error:', error);
-            return createFailResponse(res, 500, 'Internal server error');
+            console.error('安全日志检索失败', error);
+            return sendErr(res, error);
         }
     }
 }

@@ -1,6 +1,6 @@
 const { User, Password, Category, SecurityLog } = require('../models');
 const { validationResult } = require('express-validator');
-const { createSuccessResponse, createFailResponse } = require('../utils/response');
+const { sendOk, sendErr } = require('../utils/response');
 const { logSecurityEvent } = require('../utils/logger');
 const { Op } = require('sequelize');
 const { parseBoolean } = require('../utils/parsers');
@@ -59,7 +59,7 @@ const adminController = {
                     return userData;
                 }));
 
-            return createSuccessResponse(res, 200, 'Users retrieved successfully', {
+            return sendOk(res, 200, '用户列表检索成功', {
                 users: usersWithPasswordCount,
                 pagination: {
                     total: count,
@@ -69,8 +69,8 @@ const adminController = {
                 }
             });
         } catch (error) {
-            console.error('Get all users error:', error);
-            return createFailResponse(res, 500, 'Internal server error');
+            console.error('用户列表检索失败:', error);
+            return sendErr(res, error);
         }
     },
 
@@ -79,7 +79,12 @@ const adminController = {
         try {
             const errors = validationResult(req);
             if (!errors.isEmpty()) {
-                return createFailResponse(res, 400, 'Validation error', errors.array());
+                return sendErr(res, {
+                    isOperational: true,
+                    statusCode: 400,
+                    message: 'Validation failed',
+                    errors: errors.array()
+                });
             }
 
             const { id } = req.params;
@@ -88,12 +93,20 @@ const adminController = {
 
             const user = await User.findByPk(id);
             if (!user) {
-                return createFailResponse(res, 404, 'User not found');
+                return sendErr(res, {
+                    isOperational: true,
+                    statusCode: 404,
+                    message: '用户未找到',
+                });
             }
 
             // 防止管理员修改自己的角色
             if (adminId === user.id) {
-                return createFailResponse(res, 400, 'Cannot modify your own role');
+                return sendErr(res, {
+                    isOperational: true,
+                    statusCode: 400,
+                    message: '管理员不能修改自己的角色',
+                });
             }
 
             // 更新用户角色
@@ -107,13 +120,13 @@ const adminController = {
                 userAgent: req.headers['user-agent']
             });
 
-            return createSuccessResponse(res, 200, 'User role updated successfully', {
+            return sendOk(res, 200, '更新用户角色成功', {
                 userId: user.id,
                 newRole: role
             });
         } catch (error) {
-            console.error('Update user role error:', error);
-            return createFailResponse(res, 500, 'Internal server error');
+            console.error('用户角色更新失败:', error);
+            return sendErr(res, error);
         }
     },
 
@@ -122,7 +135,12 @@ const adminController = {
         try {
             const errors = validationResult(req);
             if (!errors.isEmpty()) {
-                return createFailResponse(res, 400, 'Validation error', errors.array());
+                return sendErr(res, {
+                    isOperational: true,
+                    statusCode: 400,
+                    message: 'Validation failed',
+                    errors: errors.array()
+                });
             }
 
             const { id } = req.params;
@@ -133,12 +151,20 @@ const adminController = {
 
             const user = await User.findByPk(id);
             if (!user) {
-                return createFailResponse(res, 404, 'User not found');
+                return sendErr(res, {
+                    isOperational: true,
+                    statusCode: 404,
+                    message: '用户未找到',
+                });
             }
 
             // 防止管理员禁用自己的账户
             if (adminId === user.id && !parsedIsActive) {
-                return createFailResponse(res, 400, 'Cannot disable your own account');
+                return sendErr(res, {
+                    isOperational: true,
+                    statusCode: 400,
+                    message: '管理员不能禁用自己的账户',
+                });
             }
 
             // 更新用户状态
@@ -152,10 +178,10 @@ const adminController = {
                 userAgent: req.get('User-Agent')
             });
 
-            return createSuccessResponse(res, 200, `User ${parsedIsActive ? 'enabled' : 'disabled'} successfully`);
+            return sendOk(res, 200, `用户 ${parsedIsActive ? '启用' : '禁用'} 成功`);
         } catch (error) {
-            console.error('Toggle user status error:', error);
-            return createFailResponse(res, 500, 'Internal server error');
+            console.error('用户状态切换失败:', error);
+            return sendErr(res, error);
         }
     },
 
@@ -222,10 +248,10 @@ const adminController = {
                 }))
             };
 
-            return createSuccessResponse(res, 200, 'System stats retrieved successfully', { data: stats });
+            return sendOk(res, 200, '系统统计信息检索成功', { data: stats });
         } catch (error) {
-            console.error('Get system stats error:', error);
-            return createFailResponse(res, 500, 'Internal server error');
+            console.error('系统统计信息检索失败:', error);
+            return sendErr(res, error);
         }
     },
 
@@ -258,7 +284,7 @@ const adminController = {
                 limit: parseInt(limit)
             });
 
-            return createSuccessResponse(res, 200, 'Security logs retrieved successfully', {
+            return sendOk(res, 200, '安全日志检索成功', {
                 logs,
                 pagination: {
                     total: count,
@@ -268,24 +294,10 @@ const adminController = {
                 }
             });
         } catch (error) {
-            console.error('Get security logs error:', error);
-            return createFailResponse(res, 500, 'Internal server error');
+            console.error('安全日志检索失败:', error);
+            return sendErr(res, error);
         }
     },
-
-    // 清除 Redis 缓存
-    async clearRedisCache(req, res) {
-        try {
-            await redisClient.clearAll(); // 清空所有数据库中的数据
-
-            return createSuccessResponse(res, 200, 'Redis cache cleared successfully');
-        } catch (error) {
-            console.error('Clear cache error:', error);
-            return createFailResponse(res, 500, 'Internal server error');
-        } finally {
-            await redisClient.quit(); // 关闭 Redis 连接
-        }
-    }
 }
 
 module.exports = adminController;

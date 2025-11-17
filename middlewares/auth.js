@@ -1,6 +1,6 @@
 const { verifyToken } = require('../services/authService');
 const { User, Session } = require('../models');
-const { createFailResponse } = require('../utils/response');
+const { sendErr } = require('../utils/response');
 const { isBlacklisted } = require('../services/blacklistService');
 
 const authenticate = async (req, res, next) => {
@@ -8,10 +8,18 @@ const authenticate = async (req, res, next) => {
         const authHeader = req.headers['authorization'];
 
         if (!authHeader) {
-            return createFailResponse(res, 401, 'Access token required');
+            return sendErr(res, {
+                isOperational: true,
+                statusCode: 400,
+                message: '缺少认证信息[Authorization]'
+            });
         }
         if (!authHeader.startsWith('Bearer ')) {
-            return createFailResponse(res, 401, 'Invalid authorization header format');
+            return sendErr(res, {
+                isOperational: true,
+                statusCode: 400,
+                message: '认证信息格式不正确'
+            });
         }
 
         const token = authHeader.substring(7); // 从Bearer Token中提取令牌值
@@ -28,25 +36,42 @@ const authenticate = async (req, res, next) => {
             }
          */
         const decoded = verifyToken(token); // 验证AT令牌的有效性
+
         if (!decoded) {
-            return createFailResponse(res, 401, 'Invalid or expired token');
+            return sendErr(res, {
+                isOperational: true,
+                statusCode: 401,
+                message: '无效的令牌'
+            });
         }
 
         const user = await User.findByPk(decoded.userId);
 
         if (!user || !user.isActive) {
-            return createFailResponse(res, 401, 'User not found or inactive');
+            return sendErr(res, {
+                isOperational: true,
+                statusCode: 401,
+                message: '用户不存在或已被禁用'
+            });
         }
 
         // 检查token版本是否与数据库中一致, 用于用户主动修改密码后自动失效所有旧令牌
         if (user.tokenVersion !== decoded.token_version) {
-            return createFailResponse(res, 401, 'Token is invalid or expired, please log in again');
+            return sendErr(res, {
+                isOperational: true,
+                statusCode: 401,
+                message: '令牌版本不匹配'
+            });
         }
 
         // 检查AT令牌是否在黑名单中
         const isInBlacklisted = await isBlacklisted(decoded.jti);
         if (isInBlacklisted) {
-            return createFailResponse(res, 401, 'Token is invalid or expired, please log in again');
+            return sendErr(res, {
+                isOperational: true,
+                statusCode: 401,
+                message: '令牌已被撤销'
+            });
         }
 
         // 检查当前用户现有会话是否已被注销
@@ -56,7 +81,11 @@ const authenticate = async (req, res, next) => {
             }
         })
         if (session.expiresAt < Date.now() || !session.isActive) {
-            return createFailResponse(res, 401, 'Your session has expired or been revoked');
+            return sendErr(res, {
+                isOperational: true,
+                statusCode: 401,
+                message: '会话已过期或已被注销'
+            });
         }
 
         req.user = user; // 将用户信息附加到请求对象上
@@ -65,21 +94,29 @@ const authenticate = async (req, res, next) => {
 
         next();
     } catch (error) {
-        console.error('Authentication error:', error);
-        return createFailResponse(res, 401, 'Internal server error');
+        console.error('认证失败', error);
+        return sendErr(res, error);
     }
 }
 
 function requireRole(roles) {
     return (req, res, next) => {
         if (!req.user) {
-            createFailResponse(res, 403, 'Authentication required'); // 认证失败
+            return sendErr(res, {
+                isOperational: true,
+                statusCode: 401,
+                message: '用户未登录或会话已过期'
+            });
         }
 
         const allowedRoles = Array.isArray(roles) ? roles : [roles];
 
         if (!allowedRoles.includes(req.user.role)) {
-            createFailResponse(res, 403, 'Insufficient permissions'); // 权限不足
+            return sendErr(res, {
+                isOperational: true,
+                statusCode: 403,
+                message: '权限不足'
+            });
         }
 
         next();

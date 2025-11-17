@@ -3,7 +3,7 @@ const { User, Category, Session, sequelize } = require('../models');
 const { validationResult } = require('express-validator');
 const { parseUserAgent } = require('../utils/deviceParser');
 const { generateTokenPair, verifyToken, decodeToken } = require('../services/authService');
-const { createSuccessResponse, createFailResponse } = require('../utils/response');
+const { sendOk, sendErr } = require('../utils/response');
 const { logSecurityEvent } = require('../utils/logger');
 const { addToBlacklist, isBlacklisted } = require('../services/blacklistService');
 const { Op } = require('sequelize');
@@ -18,7 +18,12 @@ const authController = {
             const errors = validationResult(req);
             if (!errors.isEmpty()) {
                 await transaction.rollback();
-                return createSuccessResponse(res, 400, 'Validation failed', errors.array());
+                return sendErr(res, {
+                    isOperational: true,
+                    statusCode: 400,
+                    message: 'Validation failed',
+                    errors: errors.array()
+                });
             }
 
             const { username, email, password, masterPasswordHint } = req.body;
@@ -32,7 +37,11 @@ const authController = {
 
             if (existingUser) {
                 await transaction.rollback();
-                return createFailResponse(res, 409, 'Username or email already exists');
+                return sendErr(res, {
+                    isOperational: true,
+                    statusCode: 409,
+                    message: '用户名或邮箱已存在'
+                });
             }
 
             // 创建新用户
@@ -62,11 +71,16 @@ const authController = {
 
             await transaction.commit(); // 提交事务
 
-            return createSuccessResponse(res, 201, 'User registered successfully. Please log in.');
+            return sendOk(res, 201, '用户注册成功', {
+                id: newUser.id,
+                username: newUser.username,
+                email: newUser.email,
+                createdAt: newUser.createdAt
+            });
         } catch (error) {
             await transaction.rollback();
-            console.error('Error during registration:', error);
-            return createFailResponse(res, 500, 'Internal server error');
+            console.error('用户注册失败', error);
+            return sendErr(res, error);
         }
     },
 
@@ -77,7 +91,12 @@ const authController = {
         try {
             const errors = validationResult(req);
             if (!errors.isEmpty()) {
-                return createFailResponse(res, 400, 'Validation failed', errors.array());
+                return sendErr(res, {
+                    isOperational: true,
+                    statusCode: 400,
+                    message: 'Validation failed',
+                    errors: errors.array()
+                });
             }
 
             const { username, password, twoFactorCode } = req.body;
@@ -92,17 +111,29 @@ const authController = {
 
 
             if (!user) {
-                return createFailResponse(res, 401, 'Invalid username or email');
+                return sendErr(res, {
+                    isOperational: true,
+                    statusCode: 401,
+                    message: '用户名或密码错误'
+                });
             }
 
             // 检查用户是否被锁定 (例如，多次登录失败后)
             if (user.lockedUntil && user.lockedUntil > new Date()) {
-                return createFailResponse(res, 423, 'Account is temporarily locked');
+                return sendErr(res, {
+                    isOperational: true,
+                    statusCode: 423,
+                    message: '账户已被锁定，请稍后再试'
+                });
             }
 
             // 检查用户是否激活
             if (!user.isActive) {
-                return createFailResponse(res, 401, 'Account is inactive');
+                return sendErr(res, {
+                    isOperational: true,
+                    statusCode: 403,
+                    message: '用户未激活'
+                });
             }
 
             // 验证密码是否正确
@@ -127,22 +158,34 @@ const authController = {
                         ip: req.ip,
                         userAgent: req.get('User-Agent')
                     });
-                    return createFailResponse(res, 423, 'Account locked due to multiple failed login attempts');
+                    return sendErr(res, {
+                        isOperational: true,
+                        statusCode: 423,
+                        message: '账户已被锁定，请稍后再试'
+                    });
                 }
 
-                return createFailResponse(res, 401, 'Invalid username or password');
+                return sendErr(res, {
+                    isOperational: true,
+                    statusCode: 401,
+                    message: '用户名或密码错误'
+                });
             }
 
             // 检查用户是否启用了双因素认证
             if (user.twoFactorEnabled) {
                 if (!twoFactorCode) {
-                    return createFailResponse(res, 401, 'Two-factor code is required for this account');
+                    return sendErr(res, {
+                        isOperational: true,
+                        statusCode: 401,
+                        message: '请提供双因素认证代码'
+                    });
                 }
 
                 // TODO: 实现双因素认证验证逻辑
                 // const isTwoFactorValid = verifyTwoFactorCode(user.twoFactorSecret, twoFactorCode); // 假设有一个函数用于验证双因素认证码
                 // if (!isTwoFactorValid) {
-                //     return createFailResponse(res, 401, 'Invalid two-factor authentication code');
+                //     return sendOk(res, 401, '双因素认证失败');
                 // }
             }
 
@@ -218,15 +261,15 @@ const authController = {
             // 提交事务
             await transaction.commit();
 
-            return createSuccessResponse(res, 200, 'Login successful', {
+            return sendOk(res, 200, '登录成功', {
                 user,
                 accessToken,
                 refreshToken
             });
         } catch (error) {
             await transaction.rollback();
-            console.error('Error during login:', error);
-            return createFailResponse(res, 500, 'Internal server error');
+            console.error('登录失败', error);
+            return sendErr(res, error);
         }
     },
 
@@ -238,7 +281,11 @@ const authController = {
 
             const decode = verifyToken(currentAT);
             if (!decode) {
-                return createFailResponse(res, 200, 'Logout successful(token was already invalid)');
+                return sendErr(res, {
+                    isOperational: true,
+                    statusCode: 401,
+                    message: '无效的访问令牌'
+                });
             }
 
             const currentSession = await Session.findOne({
@@ -249,7 +296,11 @@ const authController = {
             })
 
             if (!currentSession) {
-                return createFailResponse(res, 200, 'Logout successful(no active session found)');
+                return sendErr(res, {
+                    isOperational: true,
+                    statusCode: 401,
+                    message: '会话不存在或已过期，请重新登录'
+                });
             }
 
             // 从会话记录中解析出双jti
@@ -257,8 +308,12 @@ const authController = {
             try {
                 jtiObj = JSON.parse(currentSession.jti);
             } catch (e) {
-                console.error('Fail to parse jti from session', e);
-                createFailResponse(res, 500, 'Internal server error: corrupted session data');
+                console.error('解析会话JTI失败', e);
+                return sendErr(res, {
+                    isOperational: true,
+                    statusCode: 500,
+                    message: '内部服务器错误, 无法解析会话JTI'
+                });
             }
 
             // 计算AT和RT的剩余有效时间
@@ -288,10 +343,10 @@ const authController = {
                 userAgent: req.get('User-Agent')
             });
 
-            return createSuccessResponse(res, 200, 'Logout successful');
+            return sendOk(res, 200, '登出成功');
         } catch (error) {
-            console.error('Error during logout:', error);
-            return createFailResponse(res, 500, 'Internal server error');
+            console.error('登出失败', error);
+            return sendErr(res, error);
         }
     },
 
@@ -300,32 +355,53 @@ const authController = {
         try {
             const errors = validationResult(req);
             if (!errors.isEmpty()) {
-                return createFailResponse(res, 400, 'Validation failed', errors.array());
+                return sendErr(res, {
+                    isOperational: true,
+                    statusCode: 400,
+                    message: 'Validation failed',
+                    errors: errors.array()
+                });
             }
 
             const { refreshToken } = req.body;
 
             const isInBlacklisted = await isBlacklisted(refreshToken);
             if (isInBlacklisted) {
-                return createFailResponse(res, 401, 'Invalid or expired refresh token (blacklisted)');
+                return sendErr(res, {
+                    isOperational: true,
+                    statusCode: 401,
+                    message: '刷新令牌已被加入黑名单',
+                });
             }
 
             // 使用模型中自定义方法查找用户
             const user = await User.findByRefreshToken(refreshToken);
 
             if (!user) {
-                return createFailResponse(res, 401, 'Invalid or expired refresh token');
+                return sendErr(res, {
+                    isOperational: true,
+                    statusCode: 401,
+                    message: '无效的刷新令牌或已过期',
+                });
             }
 
             const authHeader = req.headers.authorization;
             if (!authHeader || !authHeader.startsWith('Bearer ')) {
-                return createFailResponse(res, 401, 'Refresh token endpoint requires an expired access token');
+                return sendErr(res, {
+                    isOperational: true,
+                    statusCode: 401,
+                    message: '未提供访问令牌或格式不正确',
+                });
             }
             const oldAccessToken = authHeader.substring(7);
             const decodeOldAT = decodeToken(oldAccessToken);
 
             if (!decodeOldAT) {
-                return createFailResponse(res, 401, 'The provided access token is malformed');
+                return sendErr(res, {
+                    isOperational: true,
+                    statusCode: 401,
+                    message: '无效的访问令牌',
+                });
             }
 
             // 查找并验证旧的会话记录
@@ -336,7 +412,11 @@ const authController = {
             })
 
             if (!oldSession) {
-                return createFailResponse(res, 401, 'No active session found for this user.');
+                return sendErr(res, {
+                    isOperational: true,
+                    statusCode: 401,
+                    message: '会话不存在或已过期',
+                });
             }
 
             // 从旧的会话记录的jti字段中解析出旧的RT
@@ -344,14 +424,26 @@ const authController = {
             try {
                 jtiObj = JSON.parse(oldSession.jti);
             } catch (e) {
-                return createFailResponse(res, 401, 'Internal server error: corrupted session data');
+                return sendErr(res, {
+                    isOperational: true,
+                    statusCode: 500,
+                    message: '解析会话JTI失败'
+                });
             }
-            
+
             if (jtiObj.rt !== refreshToken) {
-                return createFailResponse(res, 401, 'Invalid refresh token');
+                return sendErr(res, {
+                    isOperational: true,
+                    statusCode: 401,
+                    message: '刷新令牌不匹配',
+                });
             }
             if (!oldSession.isActive || oldSession.rtExpiresAt < new Date()) {
-                return createFailResponse(res, 401, 'Session is inactive or expired.');
+                return sendErr(res, {
+                    isOperational: true,
+                    statusCode: 401,
+                    message: '会话非活动状态或已过期',
+                });
             }
 
             // 计算RT的剩余有效时间，并将其加入黑名单。
@@ -391,13 +483,13 @@ const authController = {
                 userAgent: req.get('User-Agent')
             });
 
-            return createSuccessResponse(res, 200, 'Token refreshed successfully', {
+            return sendOk(res, 200, '令牌刷新成功', {
                 accessToken,
                 refreshToken: newRefreshToken
             });
         } catch (error) {
-            console.error('Error during refreshing token:', error);
-            return createFailResponse(res, 500, 'Internal server error');
+            console.error('刷新令牌失败', error);
+            return sendErr(res, error);
         }
     },
 }

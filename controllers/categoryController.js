@@ -1,6 +1,6 @@
 const { Category, Password, sequelize } = require('../models');
 const { validationResult } = require('express-validator');
-const { createSuccessResponse, createFailResponse } = require('../utils/response');
+const { sendOk, sendErr } = require('../utils/response');
 const { Op } = require('sequelize');
 const { logSecurityEvent } = require('../utils/logger');
 
@@ -10,7 +10,12 @@ const categoryController = {
         try {
             const errors = validationResult(req);
             if (!errors.isEmpty()) {
-                return createFailResponse(res, 400, 'Validation failed', errors.array());
+                return sendErr(res, {
+                    isOperational: true,
+                    statusCode: 400,
+                    message: 'Validation Failed',
+                    errors: errors.array()
+                });
             }
 
             const { name, color, icon } = req.body;
@@ -24,7 +29,11 @@ const categoryController = {
                 }
             });
             if (existingCategory) {
-                return createFailResponse(res, 409, 'Category with this name already exists');
+                return sendErr(res, {
+                    isOperational: true,
+                    statusCode: 409,
+                    message: '分类名称已存在'
+                });
             }
 
             // 创建分类
@@ -34,17 +43,10 @@ const categoryController = {
                 color: color || '#3498db',
                 icon: icon || 'folder',
             });
-            return createSuccessResponse(res, 201, 'Category created successfully', {
-                id: newCategory.id,
-                name: newCategory.name,
-                color: newCategory.color,
-                icon: newCategory.icon,
-                isDefault: newCategory.isDefault,
-                createdAt: newCategory.createdAt,
-            });
+            return sendOk(res, 201, '创建分类成功', { newCategory });
         } catch (error) {
-            console.error('Create category error:', error);
-            return createFailResponse(res, 500, 'Internal server error');
+            console.error('创建分类失败:', error);
+            return sendErr(res, error);
         }
     },
 
@@ -77,12 +79,12 @@ const categoryController = {
                 return categoryData;
             })
 
-            return createSuccessResponse(res, 200, 'Categories retrieved successfully', {
+            return sendOk(res, 200, '分类列表检索成功', {
                 categories: categoriesWithCount
             });
         } catch (error) {
-            console.error('Get all categories error:', error);
-            return createFailResponse(res, 500, 'Internal server error');
+            console.error('分类列表检索失败:', error);
+            return sendErr(res, error);
         }
     },
 
@@ -91,7 +93,12 @@ const categoryController = {
         try {
             const errors = validationResult(req);
             if (!errors.isEmpty()) {
-                return createFailResponse(res, 400, 'Validation failed', errors.array());
+                return sendErr(res, {
+                    isOperational: true,
+                    statusCode: 400,
+                    message: 'Validation failed',
+                    errors: errors.array()
+                });
             }
 
             const { id: categoryId } = req.params;
@@ -107,12 +114,20 @@ const categoryController = {
             })
 
             if (!existingCategory) {
-                return createFailResponse(res, 404, 'Category not found');
+                return sendErr(res, {
+                    isOperational: true,
+                    statusCode: 404,
+                    message: '分类不存在'
+                });
             }
 
             // 检查分类是否是默认分类
             if (existingCategory.isDefault) {
-                return createFailResponse(res, 403, 'Cannot update default category');
+                return sendErr(res, {
+                    isOperational: true,
+                    statusCode: 403,
+                    message: '无法更新默认分类'
+                });
             }
 
             // 检查新名称是否与其他分类冲突
@@ -125,7 +140,11 @@ const categoryController = {
                     }
                 });
                 if (duplicateCategory) {
-                    return createFailResponse(res, 409, 'Category with this name already exists');
+                    return sendErr(res, {
+                        isOperational: true,
+                        statusCode: 409,
+                        message: '分类名称已存在'
+                    });
                 }
             }
             // 更新分类
@@ -135,10 +154,10 @@ const categoryController = {
                 icon: icon || existingCategory.icon    // 如果未提供新图标，则保留原始图标
             });
 
-            return createSuccessResponse(res, 200, 'Category updated successfully')
+            return sendOk(res, 200, '分类更新成功')
         } catch (error) {
-            console.error('Update category error:', error);
-            return createFailResponse(res, 500, 'Internal server error');
+            console.error('分类更新失败:', error);
+            return sendErr(res, error);
         }
     },
 
@@ -147,7 +166,12 @@ const categoryController = {
         try {
             const errors = validationResult(req);
             if (!errors.isEmpty()) {
-                return createFailResponse(res, 400, 'Validation failed', errors.array());
+                return sendErr(res, {
+                    isOperational: true,
+                    statusCode: 400,
+                    message: 'Validation failed',
+                    errors: errors.array()
+                });
             }
 
             const { id: categoryId } = req.params;
@@ -162,12 +186,20 @@ const categoryController = {
             });
 
             if (!existingCategory) {
-                return createFailResponse(res, 404, 'Category not found');
+                return sendErr(res, {
+                    isOperational: true,
+                    statusCode: 404,
+                    message: '分类不存在'
+                })
             }
 
             // 检查分类是否是默认分类
             if (existingCategory.isDefault) {
-                return createFailResponse(res, 403, 'Cannot delete default category');
+                return sendErr(res, {
+                    isOperational: true,
+                    statusCode: 403,
+                    message: '无法删除默认分类'
+                });
             }
 
             // 检查是否有密码使用此分类, 避免孤儿记录的存在
@@ -179,16 +211,20 @@ const categoryController = {
 
             // 代表当前分类下还有关联的密码
             if (passwordsCount > 0) {
-                return createFailResponse(res, 403, 'Cannot delete category with associated passwords');
+                return sendErr(res, {
+                    isOperational: true,
+                    statusCode: 403,
+                    message: '无法删除，分类下还有密码'
+                });
             }
 
             // 删除分类
             await existingCategory.destroy();
 
-            return createSuccessResponse(res, 200, 'Category deleted successfully');
+            return sendOk(res, 200, '分类删除成功');
         } catch (error) {
-            console.error('Delete category error:', error);
-            return createFailResponse(res, 500, 'Internal server error');
+            console.error('分类删除失败:', error);
+            return sendErr(res, error);
         }
     },
 
@@ -200,7 +236,12 @@ const categoryController = {
         try {
             const errors = validationResult(req);
             if (!errors.isEmpty()) {
-                return createFailResponse(res, 400, 'Validation failed', errors.array());
+                return sendErr(res, {
+                    isOperational: true,
+                    statusCode: 400,
+                    message: 'Validation failed',
+                    errors: errors.array()
+                });
             }
 
             const { id: newDefaultCategoryId } = req.params; // 新默认分类的ID
@@ -216,13 +257,17 @@ const categoryController = {
 
             if (!categoryToSet) {
                 await transaction.rollback();
-                return createFailResponse(res, 404, 'Category not found or does not belong to you');
+                return sendErr(res, {
+                    isOperational: true,
+                    statusCode: 404,
+                    message: '分类不存在或不属于当前用户'
+                });
             }
 
             // 如果这个分类已经是默认的，则无需更改
             if (categoryToSet.isDefault) {
                 await transaction.commit();
-                return createSuccessResponse(res, 200, 'Category is already the default');
+                return sendOk(res, 200, '分类已经是默认分类，无需更改');
             }
 
             // 查找并获取旧的默认分类
@@ -268,11 +313,11 @@ const categoryController = {
             // 提交事务
             await transaction.commit();
 
-            return createSuccessResponse(res, 200, 'Default category set successfully');
+            return sendOk(res, 200, '默认分类设置成功');
         } catch (error) {
             await transaction.rollback();
-            console.error('Set default category error:', error);
-            return createFailResponse(res, 500, 'Internal server error');
+            console.error('默认分类设置失败:', error);
+            return sendErr(res, error);
         }
     }
 }

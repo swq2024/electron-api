@@ -44,10 +44,10 @@ body , quert, params 参数校验的区别是什么？前端校验是校验前�
 
 密码导出时应该生成一个唯一的文件名(*.csv/*.json)，并以附件形式返回给用户下载
 
-封装Redis客户端，封装set和get方法, clear方法, expire方法
+封装Redis客户端，封装set和get方法, clearAll方法 √
 
 什么是双因素认证？双因素认证（Two-Factor Authentication，简称2FA）是一种安全措施，要求用户在登录时提供两个或多个不同的验证因子。最常见的双因素认证方式包括: 密码 + 验证码、密码 + 安全令牌（如Google Authenticator生成的动态密码）、指纹识别等。
 
 TODO: 登录成功后, 不返回用户相关信息，只返回token, 用户相关信息在获取个人信息接口中获取
 
-TODO: 使用http-errors库封装全局自定义错误 /middlerware/errorHandler.js
+TODO: 使用http-errors库封装错误处理 √

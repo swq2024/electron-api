@@ -1,5 +1,5 @@
 const { Session } = require('../models');
-const { createSuccessResponse, createFailResponse } = require('../utils/response');
+const { sendOk, sendErr } = require('../utils/response');
 const { Op } = require('sequelize');
 
 const sessionController = {
@@ -18,10 +18,10 @@ const sessionController = {
                 order: [['createdAt', 'DESC']] // 按创建时间降序排列
             });
 
-            return createSuccessResponse(res, 200, 'Sessions retrieved successfully', { sessions });
+            return sendOk(res, 200, '会话列表获取成功', { sessions });
         } catch (error) {
-            console.error('Get sessions error:', error);
-            return createFailResponse(res, 500, 'Internal server error');
+            console.error('获取会话列表失败', error);
+            return sendErr(res, error);
         }
     },
 
@@ -40,15 +40,19 @@ const sessionController = {
             });
 
             if (!session) {
-                return createFailResponse(res, 404, 'Session not found or already revoked');
+                return sendErr(res, {
+                    isOperational: true,
+                    statusCode: 404,
+                    message: '会话不存在或已过期'
+                });
             }
 
             await session.update({ isActive: false });
 
-            return createSuccessResponse(res, 200, 'Session revoked successfully');
+            return sendOk(res, 200, '会话已注销');
         } catch (error) {
-            console.error('Delete session error:', error);
-            return createFailResponse(res, 500, 'Internal server error');
+            console.error('注销会话失败', error);
+            return sendErr(res, error);
         }
     }
 }

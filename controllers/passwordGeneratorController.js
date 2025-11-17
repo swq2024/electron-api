@@ -1,6 +1,7 @@
-const { generateRandomPassword } = require('../services/encryptionService');
-const { calculatePasswordStrength } = require('../services/passwordService')
-const { createSuccessResponse, createFailResponse } = require('../utils/response');
+const { generateRandomPassword, generateSuperStrongPassword } = require('../services/encryptionService');
+const { calculatePasswordStrength } = require('../services/passwordService');
+const { parseBoolean } = require('../utils/parsers');
+const { sendOk, sendErr } = require('../utils/response');
 
 const passwordGeneratorController = {
     // 生成随机密码
@@ -13,17 +14,27 @@ const passwordGeneratorController = {
                 includeNumbers = true,
                 includeSymbols = true,
                 excludeSimilar = true,
-                excludeAmbiguous = true
+                excludeAmbiguous = true,
+                superStrong = false, // 生成超强密码，默认不开启
+                // 添加其他配置选项...
             } = req.body;
 
             if (length < 4 || length > 128) {
-                return createFailResponse(res, 400, 'Password length must be between 4 and 128 characters');
+                return sendErr(res, {
+                    isOperational: true,
+                    statusCode: 400,
+                    message: '密码长度必须在4到128之间'
+                })
             }
             if (!includeUppercase && !includeLowercase && !includeNumbers && !includeSymbols) {
-                return createFailResponse(res, 400, 'At least one character type must be included');
+                return sendErr(res, {
+                    isOperational: true,
+                    statusCode: 400,
+                    message: '密码必须包含至少一种字符类型('
+                })
             }
 
-            const password = generateRandomPassword(length, {
+            let password = generateRandomPassword(length, {
                 includeUppercase,
                 includeLowercase,
                 includeNumbers,
@@ -32,16 +43,22 @@ const passwordGeneratorController = {
                 excludeAmbiguous
             });
 
+            // 生成超强密码
+            const parserSuperStrong = parseBoolean(superStrong);
+            if (parserSuperStrong) {
+                password = generateSuperStrongPassword(); // 默认长度为64个字符
+            }
+
             // 计算密码强度评分
             const passwordStrength = calculatePasswordStrength(password);
-            return createSuccessResponse(res, 200, 'Password generated successfully', {
+            return sendOk(res, 200, `${parserSuperStrong ? '超强密码' : '随机密码'}生成成功`, {
                 password,
                 strength: passwordStrength
             });
 
         } catch (error) {
-            console.error('Error generating random password:', error);
-            return createFailResponse(res, 'Failed to generate password');
+            console.error('生成随机密码失败', error);
+            return sendErr(res, error);
         }
     }
 }
