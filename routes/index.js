@@ -1,13 +1,14 @@
 const express = require("express");
-const fs = require("fs");
 
 const authRoutes = require("./auth");
 const userRoutes = require("./users");
 const passwordRoutes = require("./passwords");
 const likeRoutes = require("./likes");
+const uploadRoutes = require("./uploads");
 const categoryRoutes = require("./categories");
 const toolsRoutes = require("./tools");
 const seesionRoutes = require("./sessions");
+const captchaRoutes = require("./captcha");
 const adminRoutes = require("./admin");
 const indexController = require("../controllers/indexController");
 
@@ -17,9 +18,11 @@ router.use("/auth", authRoutes);
 router.use("/users", userRoutes);
 router.use("/passwords", passwordRoutes);
 router.use("/likes", likeRoutes);
+router.use("/uploads", uploadRoutes);
 router.use("/categories", categoryRoutes);
 router.use("/tools", toolsRoutes);
 router.use("/sessions", seesionRoutes);
+router.use("/captcha", captchaRoutes);
 router.use("/admin", adminRoutes);
 
 // 主页路由

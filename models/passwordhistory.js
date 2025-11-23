@@ -1,7 +1,5 @@
-'use strict';
-const {
-  Model
-} = require('sequelize');
+"use strict";
+const { Model } = require("sequelize");
 module.exports = (sequelize, DataTypes) => {
   class PasswordHistory extends Model {
     /**
@@ -10,38 +8,41 @@ module.exports = (sequelize, DataTypes) => {
      * The `models/index` file will call this method automatically.
      */
     static associate(models) {
-      PasswordHistory.belongsTo(models.Password, {
-        foreignKey: 'passwordId',
-        as: 'password',
-        onDelete: 'CASCADE' // 当密码被删除时，与之相关的密码历史记录也应被级联删除
+      models.PasswordHistory.belongsTo(models.Password, {
+        foreignKey: "passwordId",
+        as: "password",
+        onDelete: "CASCADE", // 当密码被删除时，与之相关的密码历史记录也应被级联删除
       });
     }
   }
-  PasswordHistory.init({
-    id: {
-      type: DataTypes.UUID,
-      defaultValue: DataTypes.UUIDV4,
-      primaryKey: true
+  PasswordHistory.init(
+    {
+      id: {
+        type: DataTypes.UUID,
+        defaultValue: DataTypes.UUIDV4,
+        primaryKey: true,
+      },
+      passwordId: {
+        type: DataTypes.UUID,
+        allowNull: false,
+        field: "password_id",
+      },
+      encryptedPassword: {
+        type: DataTypes.TEXT,
+        allowNull: false,
+        field: "encrypted_password",
+      },
+      changedAt: {
+        type: DataTypes.DATE,
+        defaultValue: DataTypes.NOW,
+        field: "changed_at",
+      },
     },
-    passwordId: {
-      type: DataTypes.UUID,
-      allowNull: false,
-      field: 'password_id'
+    {
+      sequelize,
+      modelName: "PasswordHistory",
+      timestamps: false,
     },
-    encryptedPassword: {
-      type: DataTypes.TEXT,
-      allowNull: false,
-      field: 'encrypted_password'
-    },
-    changedAt: {
-      type: DataTypes.DATE,
-      defaultValue: DataTypes.NOW,
-      field: 'changed_at'
-    }
-  }, {
-    sequelize,
-    modelName: 'PasswordHistory',
-    timestamps: false
-  });
+  );
   return PasswordHistory;
 };

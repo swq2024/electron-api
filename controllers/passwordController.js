@@ -1,4 +1,10 @@
-const { Password, PasswordHistory, Category, Like } = require("../models");
+const {
+  Password,
+  PasswordHistory,
+  Category,
+  Like,
+  User,
+} = require("../models");
 const { validationResult } = require("express-validator");
 const { sendOk, sendErr } = require("../utils/response");
 const { encrypt, decrypt } = require("../services/encryptionService");
@@ -724,6 +730,40 @@ const passwordController = {
       await transaction.rollback();
       sendErr(res, error);
     }
+  },
+
+  // 查询用户收藏的密码记录
+  async getUserFavoritePasswords(req, res) {
+    const { id: userId } = req.user;
+
+    // 分页
+    const query = req.query;
+    const currentPage = Math.abs(Number(query.currentPage)) || 1;
+    const pageSize = Math.abs(Number(query.pageSize)) || 10;
+    const offset = (currentPage - 1) * pageSize;
+
+    const user = await User.findByPk(userId);
+
+    // 查询当前用户收藏的密码记录
+    const likedPasswords = await user.getLikedPasswords({
+      // 查询多对多关联时，排除掉中间表
+      joinTableAttributes: [], // 不查询关联表, 这里指点赞收藏表
+      attributes: { exclude: ["userId", "passwordId"] },
+      order: [["createdAt", "DESC"]],
+      offset,
+      limit: pageSize,
+    });
+    // 查询当前用户收藏密码记录的总数
+    const count = await user.countLikedPasswords();
+
+    return sendOk(res, 200, "用户收藏的密码记录检索成功", {
+      likedPasswords,
+      pagination: {
+        total: count,
+        currentPage,
+        pageSize,
+      },
+    });
   },
 };
 

@@ -11,12 +11,28 @@ module.exports = (sequelize, DataTypes) => {
      * The `models/index` file will call this method automatically.
      */
     static associate(models) {
-      User.hasMany(models.Password, { foreignKey: "userId", as: "passwords" });
-      User.hasMany(models.Category, { foreignKey: "userId", as: "categories" });
-      User.hasMany(models.Session, { foreignKey: "userId", as: "sessions" });
-      User.hasMany(models.SecurityLog, {
+      models.User.hasMany(models.Password, {
+        foreignKey: "userId",
+        as: "passwords",
+      });
+      models.User.hasMany(models.Category, {
+        foreignKey: "userId",
+        as: "categories",
+      });
+      models.User.hasMany(models.Session, {
+        foreignKey: "userId",
+        as: "sessions",
+      });
+      models.User.hasMany(models.SecurityLog, {
         foreignKey: "userId",
         as: "securityLogs",
+      });
+      models.User.belongsToMany(models.Password, {
+        through: models.Like,
+        foreignKey: "userId",
+        // 定义别名后,可以在查询到的user对象上直接使用getLikedPasswords进行查询收藏过的密码记录/countLikedPasswords进行计数
+        // 例如: user.getLikedPasswords()/user.countLikedPasswords()
+        as: "likedPasswords",
       });
     }
 

@@ -1,6 +1,6 @@
 const express = require("express");
 const router = express.Router();
-const { body, param } = require("express-validator");
+const { body } = require("express-validator");
 const { authenticate } = require("../middlewares/auth");
 const passwordController = require("../controllers/passwordController");
 
@@ -18,5 +18,8 @@ router.post(
   ],
   passwordController.collectPassword,
 );
+
+// 用户收藏的密码记录
+router.get("/", passwordController.getUserFavoritePasswords);
 
 module.exports = router;
