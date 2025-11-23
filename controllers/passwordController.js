@@ -1,10 +1,11 @@
-const { Password, PasswordHistory, Category } = require("../models");
+const { Password, PasswordHistory, Category, Like } = require("../models");
 const { validationResult } = require("express-validator");
 const { sendOk, sendErr } = require("../utils/response");
 const { encrypt, decrypt } = require("../services/encryptionService");
 const { calculatePasswordStrength } = require("../services/passwordService");
 const { logSecurityEvent } = require("../utils/logger");
 const { Op } = require("sequelize");
+const { sequelize } = require("../models");
 
 const passwordController = {
   // 创建密码存储记录
@@ -62,8 +63,6 @@ const passwordController = {
 
       // 加密密码
       const encryptedPassword = encrypt(password, process.env.MASTER_PASSWORD);
-
-      console.log("abc", encryptedPassword);
 
       // 计算密码强度
       const passwordStrength = calculatePasswordStrength(password);
@@ -681,6 +680,49 @@ const passwordController = {
     } catch (error) {
       console.error("删除所有密码记录失败", error);
       return sendErr(res, error);
+    }
+  },
+
+  // 收藏/取消收藏密码记录
+  async collectPassword(req, res) {
+    const transaction = await sequelize.transaction();
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return sendErr(res, {
+          isOperational: true,
+          statusCode: 400,
+          message: "Validation failed",
+          errors: errors.array(),
+        });
+      }
+      const { id: userId } = req.user;
+      const { passwordId } = req.body;
+      const password = await Password.findByPk(passwordId, { transaction });
+      if (!password) {
+        return sendErr(res, new Error("password not found"));
+      }
+      const like = await Like.findOne(
+        {
+          where: { userId, passwordId },
+        },
+        { transaction },
+      );
+
+      if (!like) {
+        await Like.create({ userId, passwordId }, { transaction });
+        await password.update({ isFavorite: true }, { transaction });
+        await transaction.commit();
+        return sendOk(res, 201, "收藏成功");
+      } else {
+        await like.destroy({ transaction });
+        await password.update({ isFavorite: false }, { transaction });
+        await transaction.commit();
+        return sendOk(res, 200, "取消收藏成功");
+      }
+    } catch (error) {
+      await transaction.rollback();
+      sendErr(res, error);
     }
   },
 };
