@@ -153,7 +153,7 @@ const authController = {
       if (!user) {
         return sendErr(res, {
           isOperational: true,
-          statusCode: 401,
+          statusCode: 400,
           message: "用户名或密码错误",
         });
       }
@@ -321,7 +321,6 @@ const authController = {
       await transaction.commit();
 
       return sendOk(res, 200, "登录成功", {
-        user,
         accessToken,
         refreshToken,
       });
