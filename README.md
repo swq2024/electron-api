@@ -51,3 +51,9 @@ body , quert, params 参数校验的区别是什么？前端校验是校验前�
 TODO: 登录成功后, 不返回用户相关信息，只返回token, 用户相关信息在获取个人信息接口中获取
 
 TODO: 使用http-errors库封装错误处理 √
+
+```bash
+mklink /J "C:\Program Files\Docker" "D:\Docker\docker"
+# C:\Program Files\Docker这个目录在软链接前不能存在，否则失败。
+# 但D:\Docker\docker这个目录必须存在, 且docker的安装包必须与\docker同级目录, 正常安装后docker不会被安装到C盘
+```

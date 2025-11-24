@@ -24,8 +24,12 @@ app.use(
   }),
 );
 
-// console.log(process.env.ADMIN_EMAIL);
-// console.log(process.env.ADMIN_PASSWORD);
+// 启动邮件消费者
+const { mailConsumer } = require("./utils/rabbitMQ");
+(async () => {
+  await mailConsumer();
+  console.log("邮件消费者已启动");
+})();
 
 // 安全中间件
 app.use(helmet());

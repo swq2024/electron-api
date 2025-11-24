@@ -17,7 +17,7 @@ const { Op } = require("sequelize");
 const jwt = require("jsonwebtoken");
 const redisService = require("../services/redisService");
 const registerEmailTemplate = require("../templates/register");
-const sendMail = require("../utils/mail");
+const { mailProducer } = require("../utils/rabbitMQ");
 
 const authController = {
   // 用户注册
@@ -101,7 +101,13 @@ const authController = {
 
       const html = registerEmailTemplate(newUser.username);
 
-      await sendMail(newUser.email, "Welcome to KeyVault Pro", html);
+      const msg = {
+        to: newUser.email,
+        subject: "Welcome to KeyVault Pro",
+        html: html,
+      };
+
+      await mailProducer(msg);
 
       return sendOk(res, 201, "用户注册成功", {
         id: newUser.id,
