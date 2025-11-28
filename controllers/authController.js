@@ -154,7 +154,7 @@ const authController = {
         return sendErr(res, {
           isOperational: true,
           statusCode: 400,
-          message: "用户名或密码错误",
+          message: "无效账号",
         });
       }
 
@@ -208,7 +208,7 @@ const authController = {
 
         return sendErr(res, {
           isOperational: true,
-          statusCode: 401,
+          statusCode: 400,
           message: "用户名或密码错误",
         });
       }
@@ -218,7 +218,7 @@ const authController = {
         if (!twoFactorCode) {
           return sendErr(res, {
             isOperational: true,
-            statusCode: 401,
+            statusCode: 400,
             message: "请提供双因素认证代码",
           });
         }
