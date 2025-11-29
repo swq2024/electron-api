@@ -154,7 +154,7 @@ const authController = {
         return sendErr(res, {
           isOperational: true,
           statusCode: 400,
-          message: "无效账号",
+          message: "账号不存在",
         });
       }
 
@@ -399,13 +399,6 @@ const authController = {
         isActive: false,
       });
 
-      // 记录登出成功的安全日志
-      await logSecurityEvent(userId, "logout", {
-        reason: "User requested logout",
-        ip: req.ip,
-        userAgent: req.get("User-Agent"),
-      });
-
       return sendOk(res, 200, "登出成功");
     } catch (error) {
       console.error("登出失败", error);
@@ -432,19 +425,8 @@ const authController = {
       if (isInBlacklisted) {
         return sendErr(res, {
           isOperational: true,
-          statusCode: 401,
+          statusCode: 400,
           message: "刷新令牌已被加入黑名单",
-        });
-      }
-
-      // 使用模型中自定义方法查找用户
-      const user = await User.findByRefreshToken(refreshToken);
-
-      if (!user) {
-        return sendErr(res, {
-          isOperational: true,
-          statusCode: 401,
-          message: "无效的刷新令牌或已过期",
         });
       }
 
@@ -452,18 +434,31 @@ const authController = {
       if (!authHeader || !authHeader.startsWith("Bearer ")) {
         return sendErr(res, {
           isOperational: true,
-          statusCode: 401,
+          statusCode: 400,
           message: "未提供访问令牌或格式不正确",
         });
       }
       const oldAccessToken = authHeader.substring(7);
       const decodeOldAT = decodeToken(oldAccessToken);
 
-      if (!decodeOldAT) {
+      if (!decodeOldAT || !decodeOldAT.payload || !decodeOldAT.payload.userId) {
         return sendErr(res, {
           isOperational: true,
-          statusCode: 401,
+          statusCode: 400,
           message: "无效的访问令牌",
+        });
+      }
+
+      const userId = decodeOldAT.payload.userId;
+
+      // 使用模型中自定义方法查找用户
+      const user = await User.findByRefreshToken(userId, refreshToken);
+
+      if (!user) {
+        return sendErr(res, {
+          isOperational: true,
+          statusCode: 400,
+          message: "无效的刷新令牌或已过期",
         });
       }
 
@@ -477,7 +472,7 @@ const authController = {
       if (!oldSession) {
         return sendErr(res, {
           isOperational: true,
-          statusCode: 401,
+          statusCode: 400,
           message: "会话不存在或已过期",
         });
       }
@@ -497,14 +492,14 @@ const authController = {
       if (jtiObj.rt !== refreshToken) {
         return sendErr(res, {
           isOperational: true,
-          statusCode: 401,
+          statusCode: 400,
           message: "刷新令牌不匹配",
         });
       }
       if (!oldSession.isActive || oldSession.rtExpiresAt < new Date()) {
         return sendErr(res, {
           isOperational: true,
-          statusCode: 401,
+          statusCode: 400,
           message: "会话非活动状态或已过期",
         });
       }

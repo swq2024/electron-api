@@ -39,7 +39,6 @@ module.exports = (sequelize, DataTypes) => {
       action: {
         type: DataTypes.ENUM(
           "login",
-          "logout",
           "login_failed",
           "password_accessed",
           "password_created",

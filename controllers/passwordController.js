@@ -122,8 +122,8 @@ const passwordController = {
       const {
         categoryId,
         search,
-        page = 1,
-        limit = 20,
+        currentPage = 1,
+        pageSize = 20,
         sortBy = "title",
         sortOrder = "ASC",
       } = req.query;
@@ -144,10 +144,10 @@ const passwordController = {
       }
 
       // 计算偏移量
-      const offset = (page - 1) * limit;
+      const offset = (currentPage - 1) * pageSize;
 
       // 查询密码列表
-      const { count, rows: passwords } = await Password.findAndCountAll({
+      const { count, rows } = await Password.findAndCountAll({
         where: whereClause,
         include: [
           {
@@ -156,21 +156,43 @@ const passwordController = {
             attributes: ["id", "name", "color", "icon"],
           },
         ],
-        exclude: ["encryptedPassword"],
-
+        // 返回密码的相关字段
+        attributes: [
+          "id",
+          "title",
+          "username",
+          "isFavorite",
+          "passwordStrength",
+          "encryptedPassword",
+        ],
+        // 如果排除字段
+        // attributes: {exclude: ["xx", "xxx"]}
         order: [[sortBy, sortOrder.toUpperCase()]],
         offset,
-        limit: parseInt(limit),
+        limit: parseInt(pageSize),
       });
+
+      // 解密每个密码
+      const passwords = await Promise.all(
+        rows.map((password) => {
+          const decryptedPassword = decrypt(
+            password.encryptedPassword,
+            process.env.MASTER_PASSWORD,
+          );
+          return {
+            ...password.toJSON(),
+            password: decryptedPassword,
+          };
+        }),
+      );
 
       return sendOk(res, 200, "密码列表检索成功", {
         passwords,
         pagination: {
           total: count,
-          page: parseInt(page),
-          limit: parseInt(limit),
-          totalPages: Math.ceil(count / limit),
-          currentPage: parseInt(page),
+          pageSize: parseInt(pageSize),
+          totalPages: Math.ceil(count / pageSize),
+          currentPage: parseInt(currentPage),
         },
       });
     } catch (error) {

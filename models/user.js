@@ -42,34 +42,23 @@ module.exports = (sequelize, DataTypes) => {
     }
 
     // 请求刷新令牌接口需要通过 refreshToken 查找用户
-    static async findByRefreshToken(refreshToken) {
-      if (!refreshToken) return null;
-      // 1. 查找所有拥有 refreshTokenHash 的用户
-      // 在大型系统中，这可能会是一个性能瓶颈。
-      // 未来优化方向：将 userId 嵌入到 refreshToken 中，从而实现单用户查询。
-      const usersWithHashes = await this.scope("withHashes").findOne({
+    static async findByRefreshToken(userId, refreshToken) {
+      if (!userId || !refreshToken) return null;
+      const user = await this.scope("withHashes").findOne({
         where: {
+          id: userId,
           refreshTokenHash: {
-            [Op.ne]: null, // 不包含 null 的 refreshTokenHash，即至少有一个有效的 hash 存在
+            [Op.ne]: null, // 确保用户有 hash
           },
         },
         raw: false, // 返回完整的模型实例，而不是原始对象
       });
 
-      if (!usersWithHashes) return null; // 没有用户拥有 refreshTokenHash，返回 null
-      if (
-        !usersWithHashes ||
-        typeof usersWithHashes.compareRefreshToken !== "function"
-      ) {
-        console.error(
-          "User.findByRefreshToken did not return a valid Sequelize instance.",
-        );
-        return null; // 用户模型不包含 compareRefreshToken 方法，返回 null
-      }
+      if (!user) return null; // 用户不存在或没有 hash
 
-      const isMatch = await usersWithHashes.compareRefreshToken(refreshToken);
+      const isMatch = await user.compareRefreshToken(refreshToken);
       if (isMatch) {
-        return usersWithHashes; // 刷新令牌匹配，返回用户实例
+        return user; // 刷新令牌匹配，返回用户实例
       }
       return null; // 刷新令牌不匹配，返回 null
     }

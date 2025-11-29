@@ -88,10 +88,6 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.DATE,
         field: "last_used",
       },
-      expiresAt: {
-        type: DataTypes.DATE,
-        field: "expires_at",
-      },
       createdAt: {
         allowNull: true,
         type: DataTypes.DATE,

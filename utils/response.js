@@ -122,7 +122,7 @@ const sendErr = (res, error) => {
 
   // 构建响应体
   const response = {
-    success: false, // 失败标志
+    status: false, // 失败标志
     message: responseMessage, // 简洁提示
     errors: Array.isArray(errors) ? errors : [errors], // 错误详情数组
   };
