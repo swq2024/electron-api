@@ -302,6 +302,22 @@ const authController = {
           transaction,
         );
       } else {
+        // 使旧的 AT 立即失效
+        let oldJtiObj;
+        try {
+          oldJtiObj = JSON.parse(existingSession.jti);
+        } catch (error) {
+          console.error("解析旧会话JTI失败", error);
+        }
+        const now = Math.floor(Date.now() / 1000);
+        const oldATExpiresIn =
+          Math.floor(new Date(existingSession.expiresAt).getTime() / 1000) -
+          now;
+
+        if (oldJtiObj && oldJtiObj.at && oldATExpiresIn > 0) {
+          await addToBlacklist(oldJtiObj.at, oldATExpiresIn);
+          console.log(`旧 Access token ${oldJtiObj.at} 已加入黑名单.`);
+        }
         // 如果当前会话已存在，更新会话信息
         await existingSession.update(
           {
@@ -345,6 +361,12 @@ const authController = {
           message: "无效的访问令牌",
         });
       }
+
+      const user = await User.findOne({
+        where: {
+          id: userId,
+        },
+      });
 
       const currentSession = await Session.findOne({
         where: {
@@ -399,6 +421,13 @@ const authController = {
         isActive: false,
       });
 
+      // 清除user的refreshTokenHash
+      // 即使黑名单 Redis 出现故障或延迟，只要 refreshTokenHash 被清除
+      // refreshToken 接口中的 User.findByRefreshToken 验证就会失败，从而确保该 RT 立即失效，无法被重用。
+      await user.update({
+        refreshTokenHash: null,
+      });
+
       return sendOk(res, 200, "登出成功");
     } catch (error) {
       console.error("登出失败", error);
@@ -408,6 +437,8 @@ const authController = {
 
   // 刷新JWT令牌
   async refreshToken(req, res) {
+    // 开启事务
+    const transaction = await sequelize.transaction();
     try {
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
@@ -523,26 +554,40 @@ const authController = {
       const decodeNewAT = decodeToken(accessToken);
 
       // 更新会话记录
-      await oldSession.update({
-        jti: JSON.stringify({
-          at: decodeNewAT.payload.jti,
-          rt: newRefreshToken,
-        }),
-        expiresAt: new Date(decodeNewAT.payload.exp * 1000),
-        rtExpiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-      });
+      await oldSession.update(
+        {
+          jti: JSON.stringify({
+            at: decodeNewAT.payload.jti,
+            rt: newRefreshToken,
+          }),
+          expiresAt: new Date(decodeNewAT.payload.exp * 1000),
+          rtExpiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+        },
+        { transaction },
+      );
 
       // 更新用户的刷新令牌哈希
       const newRefreshTokenHash = await bcrypt.hash(newRefreshToken, 10);
-      await user.update({
-        refreshTokenHash: newRefreshTokenHash,
-      });
+      await user.update(
+        {
+          refreshTokenHash: newRefreshTokenHash,
+        },
+        { transaction },
+      );
 
       // 记录刷新令牌的安全日志
-      await logSecurityEvent(user.dataValues.id, "token_refreshed", {
-        ip: req.ip,
-        userAgent: req.get("User-Agent"),
-      });
+      await logSecurityEvent(
+        user.dataValues.id,
+        "token_refreshed",
+        {
+          ip: req.ip,
+          userAgent: req.get("User-Agent"),
+        },
+        null,
+        transaction,
+      );
+
+      await transaction.commit();
 
       return sendOk(res, 200, "令牌刷新成功", {
         accessToken,

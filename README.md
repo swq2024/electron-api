@@ -57,3 +57,13 @@ mklink /J "C:\Program Files\Docker" "D:\Docker\docker"
 # C:\Program Files\Docker这个目录在软链接前不能存在，否则失败。
 # 但D:\Docker\docker这个目录必须存在, 且docker的安装包必须与\docker同级目录, 正常安装后docker不会被安装到C盘
 ```
+
+TODO:按照当前的逻辑，假如在RT过期后，应该在前端axios拦截器中实现提示用户并强制退出登录还是应该在路由守卫中实现
+
+TODO:
+RT 存储与多会话支持
+目前的架构是 "每个用户只有一个有效的刷新令牌" 的模型。
+证据：您将 refreshTokenHash 存储在 User 表中。这意味着任何新登录或成功的刷新操作都会覆盖用户表中的哈希，从而使旧设备上的所有 RT 立即失效。
+优化考量：
+如果您希望支持多设备同时在线，则不应将 refreshTokenHash 放在 User 表中，而应该将它与 jti 一起存储在 Session 表中。
+如果您坚持 “单会话（后登录的设备踢出前一个）” 模型，则当前逻辑是合理的，但请确保用户知道此限制。

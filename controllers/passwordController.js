@@ -14,7 +14,7 @@ const { Op } = require("sequelize");
 const { sequelize } = require("../models");
 
 const passwordController = {
-  // 创建密码存储记录
+  // 创建密码
   async create(req, res) {
     try {
       const errors = validationResult(req);
@@ -115,7 +115,7 @@ const passwordController = {
     }
   },
 
-  // 获取所有密码存储列表
+  // 获取密码列表
   async getAll(req, res) {
     try {
       const { id: userId } = req.user;
@@ -124,7 +124,7 @@ const passwordController = {
         search,
         currentPage = 1,
         pageSize = 20,
-        sortBy = "title",
+        sortBy = "createdAt",
         sortOrder = "ASC",
       } = req.query;
 
@@ -139,7 +139,6 @@ const passwordController = {
         whereClause[Op.or] = [
           { title: { [Op.like]: `%${search}%` } },
           { username: { [Op.like]: `%${search}%` } },
-          { url: { [Op.like]: `%${search}%` } },
         ];
       }
 
@@ -159,6 +158,8 @@ const passwordController = {
         // 返回密码的相关字段
         attributes: [
           "id",
+          "url",
+          "notes",
           "title",
           "username",
           "isFavorite",
@@ -201,7 +202,7 @@ const passwordController = {
     }
   },
 
-  // 获取密码存储详情
+  // 获取密码详情
   async getById(req, res) {
     try {
       const errors = validationResult(req);
@@ -284,7 +285,7 @@ const passwordController = {
     }
   },
 
-  // 更新密码存储记录
+  // 更新密码
   async update(req, res) {
     try {
       const errors = validationResult(req);
@@ -306,7 +307,7 @@ const passwordController = {
         url,
         notes,
         categoryId,
-        customFields,
+        // customFields,
       } = req.body;
 
       // 查找现有密码记录
@@ -348,7 +349,7 @@ const passwordController = {
         url,
         notes,
         categoryId,
-        customFields: customFields || {},
+        // customFields: customFields || {},
       };
 
       // 如果提供了新密码，则加密并更新
@@ -382,7 +383,7 @@ const passwordController = {
     }
   },
 
-  // 删除密码存储记录
+  // 删除密码存储
   async delete(req, res) {
     try {
       const errors = validationResult(req);
@@ -417,18 +418,6 @@ const passwordController = {
       // 软删除
       await Password.destroy({ where: { id } });
 
-      // 记录安全日志
-      await logSecurityEvent(
-        userId,
-        "password_deleted",
-        {
-          passwordId: id,
-          ip: req.ip,
-          userAgent: req.get("User-Agent"),
-        },
-        id,
-      );
-
       return sendOk(res, 200, "密码删除成功");
     } catch (error) {
       console.error("密码删除失败", error);
@@ -436,7 +425,7 @@ const passwordController = {
     }
   },
 
-  // 批量删除密码记录
+  // 批量删除密码
   async deleteBatch(req, res) {
     // Express默认不会解析DELETE请求中的body, 所以这里需要使用POST请求
     try {
@@ -538,7 +527,7 @@ const passwordController = {
           userId,
           deletedAt: { [Op.not]: null }, // 只查询软删除的记录
         },
-        attributes: ["id", "title", "deletedAt"],
+        attributes: ["id", "title", "username", "lastUsed", "deletedAt"],
         order: [["deletedAt", "DESC"]],
         limit: limit,
         offset,
@@ -560,7 +549,7 @@ const passwordController = {
     }
   },
 
-  // 还原指定密码记录
+  // 还原指定密码
   async restore(req, res) {
     try {
       const { id } = req.params;
@@ -595,7 +584,7 @@ const passwordController = {
     }
   },
 
-  // 批量还原密码记录
+  // 批量还原密码
   async restoreAll(req, res) {
     try {
       const errors = validationResult(req);
@@ -626,7 +615,7 @@ const passwordController = {
     }
   },
 
-  // 永久删除密码记录
+  // 永久删除密码
   async deletePermanently(req, res) {
     try {
       const errors = validationResult(req);
@@ -658,7 +647,7 @@ const passwordController = {
     }
   },
 
-  // 批量永久删除密码记录
+  // 批量永久删除密码
   async deleteBatchPermanently(req, res) {
     try {
       const errors = validationResult(req);
@@ -693,7 +682,7 @@ const passwordController = {
     }
   },
 
-  // 永久删除所有密码记录
+  // 永久删除所有密码
   async deletePermanentlyAll(req, res) {
     try {
       const { id: userId } = req.user;
@@ -711,7 +700,7 @@ const passwordController = {
     }
   },
 
-  // 收藏/取消收藏密码记录
+  // 收藏/取消收藏密码
   async collectPassword(req, res) {
     const transaction = await sequelize.transaction();
     try {
@@ -754,7 +743,7 @@ const passwordController = {
     }
   },
 
-  // 查询用户收藏的密码记录
+  // 查询用户收藏的密码
   async getUserFavoritePasswords(req, res) {
     const { id: userId } = req.user;
 
@@ -767,19 +756,49 @@ const passwordController = {
     const user = await User.findByPk(userId);
 
     // 查询当前用户收藏的密码记录
-    const likedPasswords = await user.getLikedPasswords({
+    const collectPasswords = await user.getLikedPasswords({
       // 查询多对多关联时，排除掉中间表
       joinTableAttributes: [], // 不查询关联表, 这里指点赞收藏表
-      attributes: { exclude: ["userId", "passwordId"] },
+      include: [
+        {
+          model: Category,
+          as: "category",
+          attributes: ["id", "name", "color", "icon"],
+        },
+      ],
+      attributes: [
+        "id",
+        "title",
+        "url",
+        "username",
+        "encryptedPassword",
+        "notes",
+        "isFavorite",
+        "passwordStrength",
+        "lastUsed",
+        "createdAt",
+        "updatedAt",
+      ],
       order: [["createdAt", "DESC"]],
       offset,
       limit: pageSize,
     });
+
+    // 解密收藏的密码
+    const decryptedPasswords = await Promise.all(
+      collectPasswords.map((password) => {
+        const decryptedPassword = decrypt(
+          password.encryptedPassword,
+          process.env.MASTER_PASSWORD,
+        );
+        return { ...password.toJSON(), decryptedPassword };
+      }),
+    );
     // 查询当前用户收藏密码记录的总数
     const count = await user.countLikedPasswords();
 
     return sendOk(res, 200, "用户收藏的密码记录检索成功", {
-      likedPasswords,
+      decryptedPasswords,
       pagination: {
         total: count,
         currentPage,
