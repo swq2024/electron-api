@@ -123,7 +123,7 @@ const passwordController = {
         categoryId,
         search,
         currentPage = 1,
-        pageSize = 20,
+        pageSize = 10,
         sortBy = "createdAt",
         sortOrder = "ASC",
       } = req.query;
@@ -517,9 +517,9 @@ const passwordController = {
   async getAllTrash(req, res) {
     try {
       const { id: userId } = req.user;
-      const { page = 1, limit = 20 } = req.query;
+      const { currentPage = 1, pageSize = 10 } = req.query;
 
-      const offset = (page - 1) * limit;
+      const offset = (currentPage - 1) * pageSize;
 
       // 获取用户所有已删除的密码记录
       const { count, rows: deletedPasswords } = await Password.findAndCountAll({
@@ -529,7 +529,7 @@ const passwordController = {
         },
         attributes: ["id", "title", "username", "lastUsed", "deletedAt"],
         order: [["deletedAt", "DESC"]],
-        limit: limit,
+        limit: parseInt(pageSize),
         offset,
         paranoid: false, // 关闭软删除特性才能查询到软删除的记录
       });
@@ -538,9 +538,9 @@ const passwordController = {
         passwords: deletedPasswords,
         pagination: {
           total: count,
-          page: parseInt(page),
-          limit: parseInt(limit),
-          totalPages: Math.ceil(count / limit),
+          currentPage: parseInt(currentPage),
+          pageSize: parseInt(pageSize),
+          totalPages: Math.ceil(count / pageSize),
         },
       });
     } catch (error) {

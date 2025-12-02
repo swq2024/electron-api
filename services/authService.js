@@ -16,7 +16,7 @@ const generateTokenPair = (user) => {
     jti: uuidv4(), // 令牌唯一标识符，用于会话管理
   };
   const accessToken = jwt.sign(payload, process.env.JWT_SECRET, {
-    expiresIn: "20s",
+    expiresIn: "30m",
   });
   const refreshToken = uuidv4();
 

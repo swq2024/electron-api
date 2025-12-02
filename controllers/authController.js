@@ -456,8 +456,8 @@ const authController = {
       if (isInBlacklisted) {
         return sendErr(res, {
           isOperational: true,
-          statusCode: 400,
-          message: "刷新令牌已被加入黑名单",
+          statusCode: 401,
+          message: "会话已被撤销，请重新登录",
         });
       }
 
@@ -465,8 +465,8 @@ const authController = {
       if (!authHeader || !authHeader.startsWith("Bearer ")) {
         return sendErr(res, {
           isOperational: true,
-          statusCode: 400,
-          message: "未提供访问令牌或格式不正确",
+          statusCode: 401,
+          message: "未提供访问令牌",
         });
       }
       const oldAccessToken = authHeader.substring(7);
@@ -475,7 +475,7 @@ const authController = {
       if (!decodeOldAT || !decodeOldAT.payload || !decodeOldAT.payload.userId) {
         return sendErr(res, {
           isOperational: true,
-          statusCode: 400,
+          statusCode: 401,
           message: "无效的访问令牌",
         });
       }
@@ -488,8 +488,8 @@ const authController = {
       if (!user) {
         return sendErr(res, {
           isOperational: true,
-          statusCode: 400,
-          message: "无效的刷新令牌或已过期",
+          statusCode: 401,
+          message: "会话已过期或令牌无效，请重新登录",
         });
       }
 
@@ -503,7 +503,7 @@ const authController = {
       if (!oldSession) {
         return sendErr(res, {
           isOperational: true,
-          statusCode: 400,
+          statusCode: 401,
           message: "会话不存在或已过期",
         });
       }
@@ -516,21 +516,21 @@ const authController = {
         return sendErr(res, {
           isOperational: true,
           statusCode: 500,
-          message: "解析会话JTI失败",
+          message: "内部服务器错误, 无法解析会话JTI",
         });
       }
 
       if (jtiObj.rt !== refreshToken) {
         return sendErr(res, {
           isOperational: true,
-          statusCode: 400,
-          message: "刷新令牌不匹配",
+          statusCode: 401,
+          message: "令牌不匹配或已被盗用，请重新登录",
         });
       }
       if (!oldSession.isActive || oldSession.rtExpiresAt < new Date()) {
         return sendErr(res, {
           isOperational: true,
-          statusCode: 400,
+          statusCode: 401,
           message: "会话非活动状态或已过期",
         });
       }
@@ -551,20 +551,20 @@ const authController = {
       );
 
       // 解码新令牌
-      const decodeNewAT = decodeToken(accessToken);
+      // const decodeNewAT = decodeToken(accessToken);
 
       // 更新会话记录
-      await oldSession.update(
-        {
-          jti: JSON.stringify({
-            at: decodeNewAT.payload.jti,
-            rt: newRefreshToken,
-          }),
-          expiresAt: new Date(decodeNewAT.payload.exp * 1000),
-          rtExpiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-        },
-        { transaction },
-      );
+      // await oldSession.update(
+      //   {
+      //     jti: JSON.stringify({
+      //       at: decodeNewAT.payload.jti,
+      //       rt: newRefreshToken,
+      //     }),
+      //     expiresAt: new Date(decodeNewAT.payload.exp * 1000),
+      //     rtExpiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+      //   },
+      //   { transaction },
+      // );
 
       // 更新用户的刷新令牌哈希
       const newRefreshTokenHash = await bcrypt.hash(newRefreshToken, 10);
