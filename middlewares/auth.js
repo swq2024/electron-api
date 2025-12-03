@@ -47,11 +47,18 @@ const authenticate = async (req, res, next) => {
 
     const user = await User.findByPk(decoded.userId);
 
-    if (!user || !user.isActive) {
+    if (!user) {
       return sendErr(res, {
         isOperational: true,
         statusCode: 401,
-        message: "用户不存在或已被禁用",
+        message: "认证信息无效，请重新登录",
+      });
+    }
+    if (!user.isActive) {
+      return sendErr(res, {
+        isOperational: true,
+        statusCode: 403,
+        message: "账户已被禁用，无法访问",
       });
     }
 
@@ -74,13 +81,13 @@ const authenticate = async (req, res, next) => {
       });
     }
 
-    // 检查当前用户现有会话是否已被注销
+    // 检查当前用户现有会话是否存在
     const session = await Session.findOne({
       where: {
         userId: user.id,
       },
     });
-    if (session.expiresAt < Date.now() || !session.isActive) {
+    if (!session || session.expiresAt < Date.now()) {
       return sendErr(res, {
         isOperational: true,
         statusCode: 401,
@@ -122,7 +129,45 @@ const requireRole = (roles) => {
     next();
   };
 };
+
+const identifyUser = async (req, res, next) => {
+  try {
+    const authHeader = req.headers["authorization"];
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      return sendErr(res, {
+        statusCode: 400,
+        message: "缺少或格式不正确的认证信息",
+      });
+    }
+    const token = authHeader.substring(7);
+
+    const decoded = verifyToken(token);
+
+    const user = await User.findByPk(decoded.userId);
+    if (!user) {
+      return sendErr(res, {
+        statusCode: 401,
+        message: "用户不存在或身份验证失败",
+      });
+    }
+
+    req.user = user;
+    req.token = token;
+
+    next();
+  } catch (error) {
+    // 捕获签名验证失败（如 AT 过期）的错误，但依然返回 401
+    // 这里的错误处理应该比 auth.js 宽松，只处理 token 格式和签名本身的问题
+    return sendErr(res, {
+      isOperational: true,
+      statusCode: 401,
+      message: "令牌无效或已过期",
+    });
+  }
+};
+
 module.exports = {
   authenticate,
   requireRole,
+  identifyUser,
 };

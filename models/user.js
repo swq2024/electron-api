@@ -141,15 +141,6 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.STRING,
         field: "master_password_hint",
       },
-      twoFactorEnabled: {
-        type: DataTypes.BOOLEAN,
-        defaultValue: false,
-        field: "two_factor_enabled",
-      },
-      twoFactorSecret: {
-        type: DataTypes.STRING,
-        field: "two_factor_secret",
-      },
       createdAt: {
         allowNull: false,
         type: DataTypes.DATE,

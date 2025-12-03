@@ -1,8 +1,8 @@
 const express = require("express");
 const { body } = require("express-validator");
 const authController = require("../controllers/authController");
-const { authenticate } = require("../middlewares/auth");
 const { validateCaptcha } = require("../middlewares/validation");
+const { identifyUser } = require("../middlewares/auth");
 
 const router = express.Router();
 
@@ -41,7 +41,7 @@ router.post(
 );
 
 // 用户登出 /auth/logout
-router.post("/logout", authenticate, authController.logout);
+router.post("/logout", identifyUser, authController.logout);
 
 // 刷新令牌 /auth/refresh
 router.post(

@@ -9,9 +9,6 @@ const { v4: uuidv4 } = require("uuid");
 const generateTokenPair = (user) => {
   const payload = {
     userId: user.id,
-    username: user.username,
-    email: user.email,
-    role: user.role,
     token_version: user.tokenVersion, // 用户令牌版本号，用于会话管理
     jti: uuidv4(), // 令牌唯一标识符，用于会话管理
   };

@@ -137,7 +137,7 @@ const authController = {
         });
       }
 
-      const { username, password, twoFactorCode } = req.body;
+      const { username, password } = req.body;
 
       // 查找用户, 限定scope为'withHashes', 这样可以直接访问passwordHash等hash字段
       const user = await User.scope("withHashes").findOne(
@@ -194,11 +194,6 @@ const authController = {
             lockedUntil: lockTime,
           });
 
-          // 记录登录失败的安全日志
-          await logSecurityEvent(user.id, "account_locked", {
-            ip: req.ip,
-            userAgent: req.get("User-Agent"),
-          });
           return sendErr(res, {
             isOperational: true,
             statusCode: 423,
@@ -211,23 +206,6 @@ const authController = {
           statusCode: 400,
           message: "用户名或密码错误",
         });
-      }
-
-      // 检查用户是否启用了双因素认证
-      if (user.twoFactorEnabled) {
-        if (!twoFactorCode) {
-          return sendErr(res, {
-            isOperational: true,
-            statusCode: 400,
-            message: "请提供双因素认证代码",
-          });
-        }
-
-        // TODO: 实现双因素认证验证逻辑
-        // const isTwoFactorValid = verifyTwoFactorCode(user.twoFactorSecret, twoFactorCode); // 假设有一个函数用于验证双因素认证码
-        // if (!isTwoFactorValid) {
-        //     return sendOk(res, 401, '双因素认证失败');
-        // }
       }
 
       // 重置登录失败次数和锁定状态，并记录最后登录时间
@@ -266,9 +244,6 @@ const authController = {
       const existingSession = await Session.findOne({
         where: {
           userId: user.id,
-          deviceInfo: {
-            [Op.substring]: deviceInfo.deviceFingerprint, // 查找当前设备指纹匹配的会话
-          },
         },
       });
 
@@ -286,48 +261,6 @@ const authController = {
             userAgent: req.get("User-Agent"),
             expiresAt: atExpiresAt,
             rtExpiresAt: rtExpiresAt,
-          },
-          { transaction },
-        );
-        // 记录登录成功的安全日志
-        await logSecurityEvent(
-          user.id,
-          "login",
-          {
-            reason: "successful login[first login]",
-            ip: req.ip,
-            userAgent: req.get("User-Agent"),
-          },
-          null,
-          transaction,
-        );
-      } else {
-        // 使旧的 AT 立即失效
-        let oldJtiObj;
-        try {
-          oldJtiObj = JSON.parse(existingSession.jti);
-        } catch (error) {
-          console.error("解析旧会话JTI失败", error);
-        }
-        const now = Math.floor(Date.now() / 1000);
-        const oldATExpiresIn =
-          Math.floor(new Date(existingSession.expiresAt).getTime() / 1000) -
-          now;
-
-        if (oldJtiObj && oldJtiObj.at && oldATExpiresIn > 0) {
-          await addToBlacklist(oldJtiObj.at, oldATExpiresIn);
-          console.log(`旧 Access token ${oldJtiObj.at} 已加入黑名单.`);
-        }
-        // 如果当前会话已存在，更新会话信息
-        await existingSession.update(
-          {
-            expiresAt: atExpiresAt,
-            rtExpiresAt: rtExpiresAt,
-            isActive: true, // 标记为活跃状态(被当前用户在当前设备上主动登出后又重新登录了])
-            jti: JSON.stringify({
-              at: decoded.jti, // AT的jti
-              rt: refreshToken, // RT本身就是一个UUID, 它的jti就是它自己
-            }),
           },
           { transaction },
         );
@@ -416,9 +349,11 @@ const authController = {
           `Refresh token ${jtiObj.rt} added to blacklist with TTL ${rtExpiresIn}s.`,
         );
       }
-      // 更新会话状态为非活动状态
-      await currentSession.update({
-        isActive: false,
+      // 注销会话
+      await Session.destroy({
+        where: {
+          userId,
+        },
       });
 
       // 清除user的refreshTokenHash
@@ -527,11 +462,11 @@ const authController = {
           message: "令牌不匹配或已被盗用，请重新登录",
         });
       }
-      if (!oldSession.isActive || oldSession.rtExpiresAt < new Date()) {
+      if (oldSession.rtExpiresAt < new Date()) {
         return sendErr(res, {
           isOperational: true,
           statusCode: 401,
-          message: "会话非活动状态或已过期",
+          message: "刷新令牌已过期",
         });
       }
 
@@ -550,21 +485,24 @@ const authController = {
         user.dataValues,
       );
 
-      // 解码新令牌
-      // const decodeNewAT = decodeToken(accessToken);
-
-      // 更新会话记录
-      // await oldSession.update(
-      //   {
-      //     jti: JSON.stringify({
-      //       at: decodeNewAT.payload.jti,
-      //       rt: newRefreshToken,
-      //     }),
-      //     expiresAt: new Date(decodeNewAT.payload.exp * 1000),
-      //     rtExpiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-      //   },
-      //   { transaction },
-      // );
+      const decodedNewAT = decodeToken(accessToken);
+      const newAtExpiresAt = new Date(decodedNewAT.payload.exp * 1000);
+      // 更新用户的会话状态
+      await oldSession.update(
+        {
+          jti: JSON.stringify({
+            at: decodedNewAT.jti,
+            rt: newRefreshToken,
+          }),
+          expiresAt: newAtExpiresAt, // 更新为新 AT 的过期时间
+          // 如果想要实现“滑动窗口”过期（只要有活动就延长 RT 过期），这里也可以更新 rtExpiresAt
+          // 滑动窗口过期，又称滚动会话 (Rolling Session)，指的是：
+          // 只要用户在会话有效期内保持活跃（即不断使用 Access Token 访问受保护资源，并因此触发 Refresh Token 刷新），那么 Refresh Token 的过期时间就会被延长。
+          // 只有当用户在一段时间内（例如 7 天）没有任何活动时，其 Refresh Token 才会真正过期，用户才会被强制登出。
+          rtExpiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+        },
+        { transaction },
+      );
 
       // 更新用户的刷新令牌哈希
       const newRefreshTokenHash = await bcrypt.hash(newRefreshToken, 10);
@@ -573,18 +511,6 @@ const authController = {
           refreshTokenHash: newRefreshTokenHash,
         },
         { transaction },
-      );
-
-      // 记录刷新令牌的安全日志
-      await logSecurityEvent(
-        user.dataValues.id,
-        "token_refreshed",
-        {
-          ip: req.ip,
-          userAgent: req.get("User-Agent"),
-        },
-        null,
-        transaction,
       );
 
       await transaction.commit();

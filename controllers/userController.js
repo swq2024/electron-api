@@ -1,11 +1,14 @@
-const { User, SecurityLog, sequelize } = require("../models");
+const { User, SecurityLog, sequelize, Session } = require("../models");
 const { validationResult } = require("express-validator");
 const { sendOk, sendErr } = require("../utils/response");
 const { logSecurityEvent } = require("../utils/logger");
 const bcrypt = require("bcrypt");
 const { Op } = require("sequelize");
-const { generateTokenPair } = require("../services/authService");
 const { parseBoolean } = require("../utils/parsers");
+const crypto = require("crypto");
+const emailCaptchaTemplate = require("../templates/captcha");
+const { mailProducer } = require("../utils/rabbitMQ");
+const redisClient = require("../services/redisService");
 
 const userController = {
   // 获取个人信息
@@ -125,6 +128,59 @@ const userController = {
     }
   },
 
+  // 发送邮箱验证码
+  async sendEmailCode(req, res) {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return sendErr(res, {
+          isOperational: true,
+          statusCode: 400,
+          message: "Validation failed",
+          errors: errors.array(),
+        });
+      }
+      const { email } = req.body;
+      const user = await User.findOne({ where: { email } });
+      if (!user) {
+        return sendErr(res, {
+          isOperational: true,
+          statusCode: 404,
+          message: "用户不存在",
+        });
+      }
+      const code = crypto.randomInt(100000, 1000000).toString();
+      await redisClient.setEx(`email-reset-pwd:${email}`, 60 * 15, code);
+      const html = emailCaptchaTemplate(code);
+      const msg = {
+        to: email,
+        subject: "[KeyValut Pro] 邮箱验证码",
+        html,
+      };
+      await mailProducer(msg);
+      return sendOk(res, 200, "验证码已发送至您的邮箱");
+    } catch (error) {
+      console.error("发送邮箱验证码失败", error);
+      return sendErr(res, error);
+    }
+  },
+
+  // 校验邮箱验证码
+  async verifyEmailCode(req, res) {
+    const { email, code } = req.body;
+    const code_key = `email-reset-pwd:${email}`;
+    const storedCode = await redisClient.get(code_key);
+    if (!storedCode || storedCode !== code) {
+      return sendErr(res, {
+        isOperational: true,
+        statusCode: 400,
+        message: "验证码错误或已过期",
+      });
+    }
+    await redisClient.del(code_key);
+    return sendOk(res, 200, "邮箱验证成功");
+  },
+
   // 更新账户主密码
   async changePassword(req, res) {
     const transaction = await sequelize.transaction();
@@ -175,7 +231,7 @@ const userController = {
 
       // 验证新密码是否与当前密码相同, 已经在路由中使用了自定义验证规则，此处不再重复验证
 
-      // 这里直接修改password字段的值为新密码值即可。不用对newPassword进行哈希处理，
+      // 这里直接修改password字段的值为新密码值即可。不用对newPassword进行哈希处理
       // 因为已经在用户模型中对password字段(set方法)已经进行了哈希处理
       await user.update(
         {
@@ -185,7 +241,6 @@ const userController = {
       );
 
       // 更新用户的token版本号，以确保所有旧令牌失效 -> 增加版本号
-      const currentTokenVersion = user.tokenVersion; // 获取当前版本号
       await user.increment("tokenVersion", { transaction });
 
       // 清理会话
@@ -204,63 +259,6 @@ const userController = {
     } catch (error) {
       await transaction.rollback();
       console.error("更改密码失败", error);
-      return sendErr(res, error);
-    }
-  },
-
-  // 启用/禁用双因素认证
-  async toggleTwoFactorAuth(req, res) {
-    try {
-      const { id: userId } = req.user;
-      const { enable, secret } = req.body;
-
-      const user = await User.findByPk(userId);
-
-      if (!user) {
-        return sendErr(res, {
-          isOperational: true,
-          statusCode: 404,
-          message: "用户不存在",
-        });
-      }
-      const parsedEnable = parseBoolean(enable);
-
-      if (parsedEnable && !secret) {
-        return sendErr(res, {
-          isOperational: true,
-          statusCode: 400,
-          message: "启用双因素认证时，必须提供密钥",
-        });
-      }
-
-      // 验证密钥的有效性（此处仅为示例，实际应用中应进行更复杂的校验）
-      // if (parsedEnable && !validateSecret(secret)) {
-      //     return sendErr(res, {
-      //         isOperational: true,
-      //         statusCode: 400,
-      //         message: '无效的密钥'
-      //     });
-      // }
-
-      // 更新双因素认证状态和密钥
-      await user.update({
-        twoFactorEnabled: parsedEnable,
-        twoFactorSecret: parsedEnable ? secret : null,
-      });
-
-      // 记录安全日志
-      await logSecurityEvent(
-        req,
-        parsedEnable ? "two_factor_enabled" : "two_factor_disabled",
-        {
-          ip: req.ip,
-          userAgent: req.get("User-Agent"),
-        },
-      );
-
-      return sendOk(res, 200, `双因素认证已${parsedEnable ? "启用" : "禁用"}`);
-    } catch (error) {
-      console.error("启用/禁用双因素认证失败", error);
       return sendErr(res, error);
     }
   },

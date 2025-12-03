@@ -1,7 +1,7 @@
-const express = require('express');
-const { body, query } = require('express-validator');
-const userController = require('../controllers/userController');
-const { authenticate } = require('../middlewares/auth');
+const express = require("express");
+const { body, query } = require("express-validator");
+const userController = require("../controllers/userController");
+const { authenticate } = require("../middlewares/auth");
 
 const router = express.Router();
 
@@ -9,64 +9,98 @@ const router = express.Router();
 router.use(authenticate);
 
 // 获取个人信息
-router.get('/profile', userController.getProfile);
+router.get("/profile", userController.getProfile);
 
 // 更新个人信息
-router.put('/profile', [
-  body('username')
-    .optional()
-    .isLength({ min: 3, max: 50 })
-    .withMessage('Username must be between 3 and 50 characters'),
-  body('email')
-    .optional()
-    .isEmail()
-    .withMessage('Please provide a valid email'),
-  body('masterPasswordHint')
-    .optional()
-    .isLength({ max: 255 })
-    .withMessage('Master password hint must be less than 255 characters')
-], userController.updateProfile);
+router.put(
+  "/profile",
+  [
+    body("username")
+      .optional()
+      .isLength({ min: 3, max: 50 })
+      .withMessage("Username must be between 3 and 50 characters"),
+    body("email")
+      .optional()
+      .isEmail()
+      .withMessage("Please provide a valid email"),
+    body("masterPasswordHint")
+      .optional()
+      .isLength({ max: 255 })
+      .withMessage("Master password hint must be less than 255 characters"),
+  ],
+  userController.updateProfile,
+);
+
+// 发送邮箱验证码
+router.post(
+  "/email-captcha",
+  [
+    body("email")
+      .notEmpty()
+      .withMessage("Email is required")
+      .isEmail()
+      .withMessage("Please provide a valid email"),
+  ],
+  userController.sendEmailCode,
+);
+
+// 验证邮箱验证码
+router.post(
+  "/email-captcha/verify",
+  [
+    body("email")
+      .notEmpty()
+      .withMessage("Email is required")
+      .isEmail()
+      .withMessage("Please provide a valid email"),
+    body("code")
+      .notEmpty()
+      .withMessage("Code is required")
+      .isLength({ min: 6, max: 6 })
+      .withMessage("Code must be 6 characters long"),
+  ],
+  userController.verifyEmailCode,
+);
 
 // 修改密码
-router.put('/password', [
-  body('currentPassword')
-    .notEmpty()
-    .withMessage('Current password is required'),
-  body('newPassword')
-    .isLength({ min: 8 })
-    .withMessage('New password must be at least 8 characters long')
-    .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/) // 至少包含一个小写字母，一个大写字母和一个数字
-    .withMessage('New password must contain at least one lowercase letter, one uppercase letter, and one number')
-    .custom((value, { req }) => {
-      // 验证新密码是否与当前密码相同
-      if (value === req.body.currentPassword) {
-        throw new Error('New password cannot be the same as the current password');
-      }
-      return true;
-    })
-], userController.changePassword);
-
-// 启用/禁用双因素认证
-router.put('/two-factor', [
-  body('enable')
-    .isBoolean()
-    .withMessage('Enable must be a boolean'),
-  body('secret')
-    .if(body('enable').equals(true)) // 如果启用双因素认证，则需要提供密钥
-    .notEmpty()
-    .withMessage('Two-factor secret is required when enabling 2FA')
-], userController.toggleTwoFactorAuth);
+router.put(
+  "/password",
+  [
+    body("currentPassword")
+      .notEmpty()
+      .withMessage("Current password is required"),
+    body("newPassword")
+      .isLength({ min: 8 })
+      .withMessage("New password must be at least 8 characters long")
+      .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/) // 至少包含一个小写字母，一个大写字母和一个数字
+      .withMessage(
+        "New password must contain at least one lowercase letter, one uppercase letter, and one number",
+      )
+      .custom((value, { req }) => {
+        // 验证新密码是否与当前密码相同
+        if (value === req.body.currentPassword) {
+          throw new Error("新密码不能与当前密码相同");
+        }
+        return true;
+      }),
+  ],
+  userController.changePassword,
+);
 
 // 获取安全日志
-router.get('/security-logs', [
-  query('page')
-    .optional()
-    .isInt({ min: 1 })
-    .withMessage('Page must be a positive integer'),
-  query('limit')
-    .optional()
-    .isInt({ min: 1, max: 100 })
-    .withMessage('Limit must be between 1 and 100')
-], userController.getSecurityLogs);
+router.get(
+  "/security-logs",
+  [
+    query("page")
+      .optional()
+      .isInt({ min: 1 })
+      .withMessage("Page must be a positive integer"),
+    query("limit")
+      .optional()
+      .isInt({ min: 1, max: 100 })
+      .withMessage("Limit must be between 1 and 100"),
+  ],
+  userController.getSecurityLogs,
+);
 
 module.exports = router;
