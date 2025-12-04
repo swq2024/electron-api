@@ -5,11 +5,8 @@ const { authenticate } = require("../middlewares/auth");
 
 const router = express.Router();
 
-// 所有用户路由都需要认证
-router.use(authenticate);
-
 // 获取个人信息
-router.get("/profile", userController.getProfile);
+router.get("/profile", authenticate, userController.getProfile);
 
 // 更新个人信息
 router.put(
@@ -28,6 +25,7 @@ router.put(
       .isLength({ max: 255 })
       .withMessage("Master password hint must be less than 255 characters"),
   ],
+  authenticate,
   userController.updateProfile,
 );
 
@@ -48,6 +46,15 @@ router.post(
 router.post(
   "/email-captcha/verify",
   [
+    body("newPassword")
+      .notEmpty()
+      .withMessage("New password is required")
+      .isLength({ min: 8, max: 36 })
+      .withMessage("New password must be between 8 and 36 characters long")
+      .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/) // 至少包含一个小写字母，一个大写字母和一个数字
+      .withMessage(
+        "New password must contain at least one lowercase letter, one uppercase letter, and one number",
+      ),
     body("email")
       .notEmpty()
       .withMessage("Email is required")
@@ -84,6 +91,7 @@ router.put(
         return true;
       }),
   ],
+  authenticate,
   userController.changePassword,
 );
 
@@ -100,6 +108,7 @@ router.get(
       .isInt({ min: 1, max: 100 })
       .withMessage("Limit must be between 1 and 100"),
   ],
+  authenticate,
   userController.getSecurityLogs,
 );
 

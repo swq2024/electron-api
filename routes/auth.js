@@ -11,16 +11,20 @@ router.post(
   "/register",
   [
     body("username")
+      .notEmpty()
+      .withMessage("用户名不能为空")
       .isLength({ min: 6, max: 20 })
       .withMessage("用户名长度必须在6到20个字符之间"),
-    body("email").isEmail().withMessage("请输入有效的电子邮件地址"),
+    body("email")
+      .notEmpty()
+      .withMessage("邮箱不能为空")
+      .isEmail()
+      .withMessage("请输入有效的电子邮件地址"),
     body("password")
+      .notEmpty()
+      .withMessage("密码不能为空")
       .isLength({ min: 8 })
       .withMessage("密码长度必须至少为8个字符"),
-    body("masterPasswordHint")
-      .optional()
-      .isLength({ max: 255 })
-      .withMessage("密码提示长度不能超过255个字符"),
   ],
   validateCaptcha,
   authController.register,
@@ -49,21 +53,5 @@ router.post(
   [body("refreshToken").notEmpty().withMessage("Refresh token is required")],
   authController.refreshToken,
 );
-
-// 用户密码重置请求
-// router.post('/request-password-reset', [
-//     body('email')
-//         .isEmail()
-//         .withMessage('请输入有效的电子邮件地址'),
-// ], authController.requestPasswordReset)
-
-// 重置密码
-// router.post('/reset-password/:token', [
-//     body('newPassword')
-//         .notEmpty()
-//         .withMessage('新密码不能为空')
-//         .isLength({ min: 8 })
-//         .withMessage('密码长度必须至少为8个字符'),
-// ], authController.resetPassword)
 
 module.exports = router;

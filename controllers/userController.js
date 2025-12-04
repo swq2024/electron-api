@@ -1,7 +1,6 @@
 const { User, SecurityLog, sequelize, Session } = require("../models");
 const { validationResult } = require("express-validator");
 const { sendOk, sendErr } = require("../utils/response");
-const { logSecurityEvent } = require("../utils/logger");
 const bcrypt = require("bcrypt");
 const { Op } = require("sequelize");
 const { parseBoolean } = require("../utils/parsers");
@@ -167,18 +166,63 @@ const userController = {
 
   // 校验邮箱验证码
   async verifyEmailCode(req, res) {
-    const { email, code } = req.body;
-    const code_key = `email-reset-pwd:${email}`;
-    const storedCode = await redisClient.get(code_key);
-    if (!storedCode || storedCode !== code) {
-      return sendErr(res, {
-        isOperational: true,
-        statusCode: 400,
-        message: "验证码错误或已过期",
-      });
+    const transaction = await sequelize.transaction();
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return sendErr(res, {
+          isOperational: true,
+          statusCode: 400,
+          message: "Validation failed",
+          errors: errors.array(),
+        });
+      }
+      const { newPassword, email, code } = req.body;
+
+      const code_key = `email-reset-pwd:${email}`;
+      const storedCode = await redisClient.get(code_key);
+      if (!storedCode || storedCode !== code) {
+        return sendErr(res, {
+          isOperational: true,
+          statusCode: 400,
+          message: "验证码错误或已过期",
+        });
+      }
+      await redisClient.del(code_key);
+
+      const user = await User.scope("withHashes").findOne(
+        {
+          where: { email },
+        },
+        { transaction },
+      );
+      if (!user) {
+        return sendErr(res, {
+          isOperational: true,
+          statusCode: 404,
+          message: "用户不存在",
+        });
+      }
+      await user.update({ passwordHash: newPassword }, { transaction });
+
+      await user.increment("tokenVersion", { transaction });
+
+      await Session.destroy(
+        {
+          where: {
+            userId: user.id,
+          },
+        },
+        { transaction },
+      );
+
+      await transaction.commit();
+      return sendOk(res, 200, "邮箱验证成功");
+    } catch (error) {
+      await transaction.rollback();
+      console.error("校验邮箱验证码失败:", error);
+      return sendErr(res, error);
     }
-    await redisClient.del(code_key);
-    return sendOk(res, 200, "邮箱验证成功");
   },
 
   // 更新账户主密码

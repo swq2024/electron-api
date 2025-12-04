@@ -36,7 +36,7 @@ const authController = {
         });
       }
 
-      const { username, email, password, masterPasswordHint } = req.body;
+      const { username, email, password } = req.body;
 
       // 检查用户名或邮箱是否存在
       const existingUser = await User.findOne(
@@ -49,7 +49,6 @@ const authController = {
       );
 
       if (existingUser) {
-        await transaction.rollback();
         return sendErr(res, {
           isOperational: true,
           statusCode: 409,
@@ -65,7 +64,7 @@ const authController = {
           passwordHash: password,
           tokenVersion: 1,
           refreshTokenHash: null,
-          masterPasswordHint,
+          masterPasswordHint: null,
         },
         { transaction },
       );

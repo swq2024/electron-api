@@ -97,9 +97,9 @@ module.exports = (sequelize, DataTypes) => {
         field: "password_hash",
         set(value) {
           if (!value) throw new BadRequest("Password is required");
-          if (value.length < 8 || value.length > 72)
+          if (value.length < 8 || value.length > 36)
             throw new BadRequest(
-              "Password must be between 6 and 72 characters",
+              "Password must be between 8 and 36 characters",
             );
           this.setDataValue("passwordHash", bcrypt.hashSync(value, 10));
         },

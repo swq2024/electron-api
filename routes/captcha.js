@@ -23,7 +23,7 @@ router.get("/", async (req, res) => {
     });
     const key = `captcha_${uuidv4()}`;
     await redisService.setEx(key, 60 * 15, captcha.text); // 有效期15分钟
-    return sendOk(res, 200, "验证码获取成功", { key, data: captcha.data });
+    return sendOk(res, 200, "验证码获取成功", { key, captcha: captcha.data });
   } catch (error) {
     sendErr(res, error);
   }
