@@ -230,6 +230,16 @@ const authController = {
         { transaction },
       );
 
+      // 无论何时登录都销毁旧会话->创建新会话
+      await Session.destroy(
+        {
+          where: {
+            userId: user.id,
+          },
+        },
+        { transaction },
+      );
+
       // 解码JWT以获取过期时间等信息
       const decoded = jwt.decode(accessToken);
 
@@ -240,32 +250,23 @@ const authController = {
 
       // 记录会话信息
       const deviceInfo = parseUserAgent(req.get("User-Agent")); // 解析用户代理字符串以获取设备信息
-      const existingSession = await Session.findOne({
-        where: {
+
+      await Session.create(
+        {
           userId: user.id,
+          jti: JSON.stringify({
+            at: decoded.jti, // AT的jti
+            rt: refreshToken, // RT本身就是一个UUID, 它的jti就是它自己
+          }),
+          deviceInfo,
+          ipAddress: req.ip,
+          userAgent: req.get("User-Agent"),
+          expiresAt: atExpiresAt,
+          rtExpiresAt: rtExpiresAt,
         },
-      });
+        { transaction },
+      );
 
-      // 如果当前会话不存在，则创建一个新会话，保证同一设备，只保留一个有效的会话记录
-      if (!existingSession) {
-        await Session.create(
-          {
-            userId: user.id,
-            jti: JSON.stringify({
-              at: decoded.jti, // AT的jti
-              rt: refreshToken, // RT本身就是一个UUID, 它的jti就是它自己
-            }),
-            deviceInfo,
-            ipAddress: req.ip,
-            userAgent: req.get("User-Agent"),
-            expiresAt: atExpiresAt,
-            rtExpiresAt: rtExpiresAt,
-          },
-          { transaction },
-        );
-      }
-
-      // 提交事务
       await transaction.commit();
 
       return sendOk(res, 200, "登录成功", {
@@ -458,7 +459,7 @@ const authController = {
         return sendErr(res, {
           isOperational: true,
           statusCode: 401,
-          message: "令牌不匹配或已被盗用，请重新登录",
+          message: "令牌不匹配，请重新登录",
         });
       }
       if (oldSession.rtExpiresAt < new Date()) {

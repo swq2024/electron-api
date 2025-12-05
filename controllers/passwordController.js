@@ -125,10 +125,9 @@ const passwordController = {
         currentPage = 1,
         pageSize = 10,
         sortBy = "createdAt",
-        sortOrder = "ASC",
+        sortOrder = "DESC",
       } = req.query;
 
-      // 构建查询条件
       const whereClause = {
         userId,
       };
@@ -142,10 +141,8 @@ const passwordController = {
         ];
       }
 
-      // 计算偏移量
       const offset = (currentPage - 1) * pageSize;
 
-      // 查询密码列表
       const { count, rows } = await Password.findAndCountAll({
         where: whereClause,
         include: [
