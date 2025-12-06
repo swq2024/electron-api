@@ -2,6 +2,7 @@
 const { Model, Op } = require("sequelize");
 const bcrypt = require("bcrypt");
 const { BadRequest } = require("http-errors");
+const dayjs = require("dayjs");
 
 module.exports = (sequelize, DataTypes) => {
   class User extends Model {
@@ -127,6 +128,12 @@ module.exports = (sequelize, DataTypes) => {
       lastLogin: {
         type: DataTypes.DATE,
         field: "last_login",
+        get() {
+          if (!this.getDataValue("lastLogin")) return null;
+          return dayjs(this.getDataValue("lastLogin")).format(
+            "YYYY-MM-DD HH:mm:ss",
+          );
+        },
       },
       failedLoginAttempts: {
         type: DataTypes.INTEGER,
@@ -136,6 +143,12 @@ module.exports = (sequelize, DataTypes) => {
       lockedUntil: {
         type: DataTypes.DATE,
         field: "locked_until",
+        get() {
+          if (!this.getDataValue("lockedUntil")) return null;
+          return dayjs(this.getDataValue("lockedUntil")).format(
+            "YYYY-MM-DD HH:mm:ss",
+          );
+        },
       },
       masterPasswordHint: {
         type: DataTypes.STRING,
@@ -144,10 +157,22 @@ module.exports = (sequelize, DataTypes) => {
       createdAt: {
         allowNull: false,
         type: DataTypes.DATE,
+        get() {
+          if (!this.getDataValue("createdAt")) return null;
+          return dayjs(this.getDataValue("createdAt")).format(
+            "YYYY-MM-DD HH:mm:ss",
+          );
+        },
       },
       updatedAt: {
         allowNull: false,
         type: DataTypes.DATE,
+        get() {
+          if (!this.getDataValue("updatedAt")) return null;
+          return dayjs(this.getDataValue("updatedAt")).format(
+            "YYYY-MM-DD HH:mm:ss",
+          );
+        },
       },
     },
     {

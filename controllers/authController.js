@@ -226,6 +226,7 @@ const authController = {
       await user.update(
         {
           refreshTokenHash: newRefreshTokenHash,
+          lastLogin: new Date(), // 记录当前时间为最后登录时间
         },
         { transaction },
       );

@@ -94,7 +94,7 @@ const adminController = {
       }
 
       const { id } = req.params;
-      const { role } = req.body;
+      const { role, reason } = req.body;
       const { id: adminId } = req.user; // 获取当前管理员的ID
 
       const user = await User.findByPk(id);
@@ -122,6 +122,7 @@ const adminController = {
       logSecurityEvent(adminId, "user_role_updated", {
         targetUserId: user.id,
         newRole: role,
+        reason: reason || "管理员手动修改",
         ip: req.ip,
         userAgent: req.headers["user-agent"],
       });
@@ -153,7 +154,7 @@ const adminController = {
       const { isActive } = req.body;
       const { id: adminId } = req.user; // 获取当前管理员的ID
 
-      const parsedIsActive = parseBoolean(isActive);
+      // const parsedIsActive = parseBoolean(isActive);
 
       const user = await User.findByPk(id);
       if (!user) {
@@ -165,7 +166,7 @@ const adminController = {
       }
 
       // 防止管理员禁用自己的账户
-      if (adminId === user.id && !parsedIsActive) {
+      if (adminId === user.id && !isActive) {
         return sendErr(res, {
           isOperational: true,
           statusCode: 400,
@@ -174,9 +175,9 @@ const adminController = {
       }
 
       // 更新用户状态
-      await user.update({ isActive: parsedIsActive });
+      await user.update({ isActive: isActive });
       // 如果禁用用户
-      if (!parsedIsActive) {
+      if (!isActive) {
         // 销毁会话: 立即踢出用户，使其 AT/RT 失效
         await Session.destroy({ where: { userId: user.id } });
         // 清除用户refreshTokenHash
@@ -188,16 +189,16 @@ const adminController = {
       // 记录安全日志
       await logSecurityEvent(
         adminId,
-        parsedIsActive ? "user_enabled" : "user_disabled",
+        isActive ? "user_enabled" : "user_disabled",
         {
           targetUserId: user.id,
-          newStatus: parsedIsActive ? "active" : "inactive",
+          newStatus: isActive ? "active" : "inactive",
           ip: req.ip,
           userAgent: req.get("User-Agent"),
         },
       );
 
-      return sendOk(res, 200, `用户 ${parsedIsActive ? "启用" : "禁用"} 成功`);
+      return sendOk(res, 200, `用户${isActive ? "启用" : "禁用"}成功`);
     } catch (error) {
       console.error("用户状态切换失败:", error);
       return sendErr(res, error);
@@ -208,10 +209,9 @@ const adminController = {
   async getSystemStats(req, res) {
     try {
       // 用户统计
-      const totalUsers = await User.count();
-      const activeUsers = await User.count({ where: { isActive: true } });
       const adminUsers = await User.count({ where: { role: "admin" } });
       const vipUsers = await User.count({ where: { role: "vip" } });
+      const userUsers = await User.count({ where: { role: "user" } });
 
       // 密码统计
       const totalPasswords = await Password.count();
@@ -220,14 +220,16 @@ const adminController = {
           passwordStrength: { [Op.gte]: 4 }, // 密码强度评分大于等于4为强密码
         },
       });
+      const mediumPasswords = await Password.count({
+        where: {
+          passwordStrength: { [Op.between]: [2, 4] }, // 密码强度评分在2到4之间为中等密码
+        },
+      });
       const weakPasswords = await Password.count({
         where: {
           passwordStrength: { [Op.lte]: 2 }, // 密码强度评分小于等于2为弱密码
         },
       });
-
-      // 分类统计
-      const totalCategories = await Category.count();
 
       // 最近活跃用户
       const recentlyActiveUsers = await User.findAll({
@@ -243,22 +245,38 @@ const adminController = {
 
       // 组装统计信息
       const stats = {
-        users: {
-          total: totalUsers,
-          active: activeUsers,
-          admins: adminUsers,
-          vips: vipUsers,
-        },
-        passwords: {
-          total: totalPasswords,
-          strong: strongPasswords,
-          weak: weakPasswords,
-        },
-        categories: {
-          total: totalCategories,
-        },
+        users: [
+          {
+            name: "admins",
+            value: adminUsers,
+            color: "#1890ff",
+          },
+          {
+            name: "vips",
+            value: vipUsers,
+            color: "#fadb14",
+          },
+          {
+            name: "users",
+            value: userUsers,
+            color: "#13c2c2",
+          },
+        ],
+        passwords: [
+          {
+            name: "strong",
+            value: strongPasswords,
+          },
+          {
+            name: "medium",
+            value: mediumPasswords,
+          },
+          {
+            name: "weak",
+            value: weakPasswords,
+          },
+        ],
         recentlyActiveUsers: recentlyActiveUsers.map((user) => ({
-          id: user.id,
           username: user.username,
           email: user.email,
           lastLogin: user.lastLogin,

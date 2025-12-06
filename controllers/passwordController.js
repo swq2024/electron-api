@@ -126,6 +126,7 @@ const passwordController = {
         pageSize = 10,
         sortBy = "createdAt",
         sortOrder = "DESC",
+        isFavorite = false,
       } = req.query;
 
       const whereClause = {
@@ -133,6 +134,9 @@ const passwordController = {
       };
       if (categoryId) {
         whereClause.categoryId = categoryId;
+      }
+      if (isFavorite) {
+        whereClause.isFavorite = true;
       }
       if (search) {
         whereClause[Op.or] = [
